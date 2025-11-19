@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Portfolio MTF Tracker</title>
+  <style>
+    :root {
+      --color-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --color-surface: #ffffff;
+      --color-primary: #667eea;
+      --color-primary-hover: #5568d3;
+      --color-accent: #764ba2;
+      --color-text: #2d3748;
+      --color-text-light: #718096;
+      --color-border: #e2e8f0;
+      --color-danger: #f56565;
+      --color-success: #48bb78;
+      --color-warning: #ed8936;
+      --color-info: #4299e1;
+      --color-focus-ring: rgba(102, 126, 234, 0.4);
+      --color-secondary: rgba(237, 242, 247, 1);
+      --color-card-bg: #f7fafc;
+      --radius: 12px;
+      --shadow: 0 4px 6px rgba(0,0,0,0.07);
+      --shadow-lg: 0 10px 25px rgba(0,0,0,0.1);
+      --font-normal: 400;
+      --font-medium: 500;
+      --font-bold: 600;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;
+    }
+    html, body {
+      height: 100%;
+      background: var(--color-bg);
+      margin: 0;
+      padding: clamp(12px, 2vw, 32px);
+      box-sizing: border-box;
+      font-family: inherit;
+      color: var(--color-text);
+      overflow-x: hidden;
+    }
+    .container {
+      max-width: min(1100px, calc(100vw - 32px));
+      margin: 24px auto;
+      background: var(--color-surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      padding: clamp(24px, 4vw, 48px);
+      border: none;
+    }
+    h1, h2 {
+      margin-bottom: 8px;
+      font-weight: var(--font-bold);
+      letter-spacing: -0.01em;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      color: var(--color-text-light);
+      font-size: 15px;
+      margin-bottom: 24px;
+    }
+    .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      margin-bottom: 18px;
+      align-items: flex-end;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 130px;
+      min-width: 110px;
+    }
+    .form-group label {
+      font-size: 13px;
+      font-weight: var(--font-medium);
+      margin-bottom: 5px;
+    }
+    .form-group input, .form-group select {
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 2px solid var(--color-border);
+      font-size: 15px;
+      font-family: inherit;
+      background: white;
+      color: var(--color-text);
+      box-sizing: border-box;
+      transition: all 0.2s ease;
+    }
+    .form-group input:focus, .form-group select:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px var(--color-focus-ring);
+    }
+    .autocomplete-dropdown {
+      position: absolute;
+      background: white;
+      border: 2px solid var(--color-border);
+      border-radius: 8px;
+      max-height: 240px;
+      overflow-y: auto;
+      z-index: 1000;
+      width: 100%;
+      margin-top: 4px;
+      box-shadow: var(--shadow-lg);
+    }
+    .autocomplete-item {
+      padding: 12px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--color-border);
+      transition: background 0.15s;
+    }
+    .autocomplete-item:hover {
+      background: var(--color-secondary);
+    }
+    .autocomplete-item strong {
+      color: var(--color-primary);
+      font-weight: 600;
+    }
+    .autocomplete-item small {
+      color: var(--color-text-light);
+      display: block;
+      font-size: 13px;
+      margin-top: 2px;
+    }
+    .mtf-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--color-text-light);
+      margin-top: 6px;
+    }
+    .mtf-toggle input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+    }
+    .btn {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+      color: #fff;
+      border: none;
+      padding: 12px 28px;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: var(--font-bold);
+      transition: all 0.3s ease;
+      margin-left: 8px;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+    .btn:active, .btn:focus {
+      transform: translateY(0);
+      background: linear-gradient(135deg, var(--color-primary-hover), var(--color-accent));
+    }
+    #portfolioWrap {
+      overflow-x: auto;
+    }
+    .portfolio-table {
+      margin-top: 32px;
+      min-width: 960px;
+      width: 100%;
+      border-collapse: collapse;
+      background-color: var(--color-surface);
+      box-shadow: var(--shadow-lg);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .portfolio-table th, .portfolio-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--color-border);
+      text-align: center;
+      font-size: 14px;
+    }
+    .portfolio-table thead th {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+      color: white;
+      font-weight: var(--font-bold);
+      text-transform: uppercase;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+    }
+    .portfolio-table tbody tr {
+      transition: background 0.2s ease;
+    }
+    .portfolio-table tbody tr:hover {
+      background: var(--color-card-bg);
+    }
+    .status-profit { 
+      color: var(--color-success); 
+      font-weight: 600;
+      background: rgba(72, 187, 120, 0.1);
+      padding: 4px 12px;
+      border-radius: 16px;
+      display: inline-block;
+    }
+    .status-loss { 
+      color: var(--color-danger); 
+      font-weight: 600;
+      background: rgba(245, 101, 101, 0.1);
+      padding: 4px 12px;
+      border-radius: 16px;
+      display: inline-block;
+    }
+    .status-neutral { 
+      color: var(--color-warning); 
+      font-weight: 600;
+      background: rgba(237, 137, 54, 0.1);
+      padding: 4px 12px;
+      border-radius: 16px;
+      display: inline-block;
+    }
+    .delete-btn {
+      background: var(--color-danger);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 5px 14px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .flex {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: stretch;
+      gap: 20px;
+      margin-top: 32px;
+      justify-content: space-between;
+    }
+    .summary-card {
+      flex: 1;
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 2px solid var(--color-border);
+      padding: 24px;
+      min-width: 210px;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+    .summary-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+      border-color: var(--color-primary);
+    }
+    .summary-title { 
+      font-size: 13px; 
+      color: var(--color-text-light);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .summary-value { 
+      font-size: 28px; 
+      font-weight: 700;
+      margin: 8px 0;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .summary-detail { font-size: 13px; color: var(--color-text-light); }
+    .insights-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      margin-top: 24px;
+    }
+    .insight-card {
+      background: rgba(255,255,255,0.9);
+      border-radius: var(--radius);
+      border: 2px solid var(--color-border);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .insight-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--color-text-light);
+      font-weight: 600;
+    }
+    .insight-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--color-primary);
+    }
+    .insight-meta {
+      font-size: 13px;
+      color: var(--color-text-light);
+    }
+    @media (max-width: 800px) {
+      .container { padding: 10px;}
+      .flex { flex-direction: column; gap: 10px;}
+      .portfolio-table th, .portfolio-table td { font-size: 13px;}
+    }
+  </style>
+</head>
+<body>
+  <!-- Login Screen -->
+  <div id="loginScreen" class="container" style="max-width: 420px; margin-top: 80px; padding: 48px;">
+    <div style="text-align: center; margin-bottom: 32px;">
+      <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--color-primary), var(--color-accent)); border-radius: 50%; margin: 0 auto 24px; display: flex; align-items: center; justify-content: center; font-size: 36px;">📊</div>
+      <h1 style="font-size: 28px; margin-bottom: 8px;">Stock Portfolio Tracker</h1>
+      <p class="subtitle" style="margin: 0;">Sign in to continue to your portfolio</p>
+    </div>
+    
+    <div style="margin-bottom: 16px;">
+      <div class="form-group" style="margin-bottom: 0;">
+        <input type="text" id="loginUsername" placeholder="Enter your username" style="width: 100%; padding: 14px 16px; font-size: 16px; border: 2px solid var(--color-border); border-radius: 8px;" autocomplete="username">
+      </div>
+    </div>
+    
+    <div style="margin-bottom: 24px;">
+      <div class="form-group" style="margin-bottom: 0;">
+        <input type="password" id="loginPassword" placeholder="Enter your password" style="width: 100%; padding: 14px 16px; font-size: 16px; border: 2px solid var(--color-border); border-radius: 8px;" autocomplete="current-password">
+      </div>
+    </div>
+    
+    <div style="margin-bottom: 24px;">
+      <button id="loginButton" class="btn" onclick="handleLogin()" style="width: 100%; padding: 14px; font-size: 16px; margin: 0;">Sign in</button>
+    </div>
+    
+    <div style="text-align: center; margin: 24px 0; position: relative;">
+      <span style="background: var(--color-surface); padding: 0 16px; position: relative; z-index: 1; color: var(--color-text-light); font-size: 14px;">or</span>
+      <div style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: var(--color-border); z-index: 0;"></div>
+    </div>
+    
+    <div>
+      <button class="btn" onclick="showSignupForm()" style="width: 100%; background: white; color: var(--color-primary); border: 2px solid var(--color-border); padding: 14px; font-size: 16px; margin: 0; box-shadow: none;">Create account</button>
+    </div>
+    
+    <div id="loginError" style="color: var(--color-danger); margin-top: 20px; text-align: center; font-size: 14px; padding: 12px; background: rgba(245, 101, 101, 0.1); border-radius: 8px; display: none;"></div>
+    
+    <p style="text-align: center; margin-top: 32px; font-size: 13px; color: var(--color-text-light);">
+      🔒 Your data is stored securely and locally in your browser
+    </p>
+  </div>
+
+  <!-- Signup Screen -->
+  <div id="signupScreen" class="container" style="max-width: 420px; margin-top: 80px; padding: 48px; display: none;">
+    <div style="text-align: center; margin-bottom: 32px;">
+      <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--color-primary), var(--color-accent)); border-radius: 50%; margin: 0 auto 24px; display: flex; align-items: center; justify-content: center; font-size: 36px;">📊</div>
+      <h1 style="font-size: 28px; margin-bottom: 8px;">Create Account</h1>
+      <p class="subtitle" style="margin: 0;">Start tracking your stock portfolio</p>
+    </div>
+    
+    <div style="margin-bottom: 16px;">
+      <div class="form-group" style="margin-bottom: 0;">
+        <input type="text" id="signupUsername" placeholder="Choose a username" style="width: 100%; padding: 14px 16px; font-size: 16px; border: 2px solid var(--color-border); border-radius: 8px;" autocomplete="username">
+      </div>
+    </div>
+    
+    <div style="margin-bottom: 16px;">
+      <div class="form-group" style="margin-bottom: 0;">
+        <input type="password" id="signupPassword" placeholder="Create a password" style="width: 100%; padding: 14px 16px; font-size: 16px; border: 2px solid var(--color-border); border-radius: 8px;" autocomplete="new-password">
+      </div>
+    </div>
+    
+    <div style="margin-bottom: 24px;">
+      <div class="form-group" style="margin-bottom: 0;">
+        <input type="password" id="signupPasswordConfirm" placeholder="Confirm password" style="width: 100%; padding: 14px 16px; font-size: 16px; border: 2px solid var(--color-border); border-radius: 8px;" autocomplete="new-password">
+      </div>
+    </div>
+    
+    <div style="margin-bottom: 24px;">
+      <button class="btn" onclick="handleSignup()" style="width: 100%; padding: 14px; font-size: 16px; margin: 0;">Create Account</button>
+    </div>
+    
+    <div style="text-align: center;">
+      <button onclick="showLoginForm()" style="background: transparent; border: none; color: var(--color-primary); cursor: pointer; font-size: 14px; text-decoration: underline;">Already have an account? Sign in</button>
+    </div>
+    
+    <div id="signupError" style="color: var(--color-danger); margin-top: 20px; text-align: center; font-size: 14px; padding: 12px; background: rgba(245, 101, 101, 0.1); border-radius: 8px; display: none;"></div>
+    
+    <div id="passwordStrength" style="margin-top: 16px; padding: 8px 12px; border-radius: 8px; font-size: 13px; display: none;"></div>
+  </div>
+
+  <!-- Main App (hidden initially) -->
+  <div id="mainApp" class="container" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <h1>📊 Stock Portfolio MTF Tracker</h1>
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <span style="color: var(--color-primary); font-weight: 600;">👤 <span id="displayUsername"></span></span>
+        <button onclick="handleLogout()" style="background: var(--color-danger); color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600;">Logout</button>
+      </div>
+    </div>
+    <p class="subtitle">
+      Track your leveraged stock positions with live price updates • Broker: <b>Pocketfull</b> • MTF supported
+    </p>
+    <form id="addForm">
+      <div class="form-row">
+        <div class="form-group" style="position: relative;">
+          <label for="companySearch">Search Company Name</label>
+          <input type="text" id="companySearch" placeholder="Type company name..." autocomplete="off">
+          <div id="autocompleteDropdown" class="autocomplete-dropdown" style="display:none;"></div>
+        </div>
+        <div class="form-group">
+          <label for="symbol">Stock Symbol (NSE)</label>
+          <input type="text" id="symbol" placeholder="Auto-filled" readonly style="background:#f7fafc;">
+        </div>
+        <div class="form-group">
+          <label for="company">Company Name</label>
+          <input type="text" id="company" placeholder="Auto-filled" readonly style="background:#f7fafc;">
+        </div>
+        <div class="form-group">
+          <label for="broker">Broker</label>
+          <select id="broker" required></select>
+          <small style="color:var(--color-text-light);font-size:12px;">Pocketfull by default. Pick another broker if needed.</small>
+        </div>
+        <div class="form-group">
+          <label for="entryDate">Entry Date</label>
+          <input type="date" id="entryDate" required>
+        </div>
+        <div class="form-group">
+          <label for="entryPrice">Entry Price</label>
+          <input type="number" step="0.01" min="0" id="entryPrice" required>
+        </div>
+        <div class="form-group">
+          <label for="quantity">Quantity</label>
+          <input type="number" step="1" min="1" id="quantity" required>
+        </div>
+        <div class="form-group">
+          <label for="ownCapital">Own Capital Used (₹)</label>
+          <input type="number" min="1" id="ownCapital" required>
+        </div>
+        <div class="form-group">
+          <label for="mtfFunds">MTF Funds Used (₹)</label>
+          <input type="number" min="0" id="mtfFunds" value="0" required>
+          <label class="mtf-toggle"><input type="checkbox" id="mtfEnabled" checked> Using MTF for this trade</label>
+          <small style="color:var(--color-text-light);font-size:12px;">Interest auto-calculates from broker rules.</small>
+        </div>
+        <div class="form-group">
+          <label for="interest">Daily Interest Rate (%)</label>
+          <input type="number" step="0.001" id="interest" placeholder="Default: 0.035" value="0.035" required>
+        </div>
+        <button class="btn" type="submit">Add Stock</button>
+      </div>
+    </form>
+    <div id="errorMsg" style="color:var(--color-danger);margin-bottom:10px;"></div>
+    <div id="portfolioWrap">
+      <table class="portfolio-table" id="portfolioTable">
+        <thead>
+          <tr>
+            <th>Stock</th>
+            <th>Company</th>
+            <th>Broker</th>
+            <th>Entry Date</th>
+            <th>Entry Price</th>
+            <th>Qty</th>
+            <th>Own Capital (₹)</th>
+            <th>MTF (₹)</th>
+            <th>Total Investment (₹)</th>
+            <th>Leverage (x)</th>
+            <th>Current Price</th>
+            <th>Current Value (₹)</th>
+            <th>Total P/L (₹)</th>
+            <th>P/L %</th>
+            <th>Days Held</th>
+            <th>Total Interest (₹)</th>
+            <th>Net P/L (₹)</th>
+            <th>Net ROI (%)</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="portfolioBody">
+        </tbody>
+      </table>
+    </div>
+    <div class="flex" id="summaryWrap">
+      <!-- Summary cards injected here -->
+    </div>
+    <div id="insightsWrap" class="insights-grid"></div>
+    <p style="margin-top:32px;font-size:14px;color:var(--color-primary);">
+      * Live prices fetched from NSE using a public market API (for demo;<br>production: <b>add your Pocketfull API credentials in JS</b>).
+      <br>* All calculations update automatically as prices change.
+    </p>
+  </div>
+<script>
+  // ====== CONFIGURATION =======
+  // By default uses a public NSE API. To connect your own Pocketfull API,
+  // replace fetchNSEPrice() implementation with proper Pocketfull REST API.
+
+  // Broker catalog with indicative daily MTF rates (%)
+  const brokerCatalog = [
+    {
+      id: 'POCKETFULL',
+      name: 'Pocketfull',
+      rateStrategy: {
+        type: 'tiered_per_lakh',
+        tiers: [
+          { max: 100000, perDayPerLakh: 16.4 },
+          { max: 2500000, perDayPerLakh: 40 },
+          { max: Infinity, perDayPerLakh: 43.8 }
+        ]
+      }
+    },
+    { id: 'ZERODHA', name: 'Zerodha', rateStrategy: { type: 'flat_percent', percentPerDay: 0.04 } },
+    { id: 'UPSTOX', name: 'Upstox', rateStrategy: { type: 'flat_percent', percentPerDay: 0.05 } }, // ₹20 per ₹40k -> 0.05%
+    { id: 'ANGELONE', name: 'Angel One', rateStrategy: { type: 'flat_percent', percentPerDay: 0.039 } },
+    { id: 'ICICIDIRECT', name: 'ICICI Direct', rateStrategy: { type: 'flat_percent', percentPerDay: 0.042 } },
+    { id: 'HDFCSEC', name: 'HDFC Securities', rateStrategy: { type: 'flat_percent', percentPerDay: 0.041 } },
+    { id: 'KOTAK', name: 'Kotak Securities', rateStrategy: { type: 'flat_percent', percentPerDay: 0.041 } },
+    { id: 'MOTILAL', name: 'Motilal Oswal', rateStrategy: { type: 'flat_percent', percentPerDay: 0.043 } },
+    { id: 'SHAREKHAN', name: 'Sharekhan', rateStrategy: { type: 'flat_percent', percentPerDay: 0.04 } },
+    {
+      id: 'GROWW',
+      name: 'Groww',
+      rateStrategy: {
+        type: 'annual_tiered_percent',
+        tiers: [
+          { max: 2500000, annualPercent: 15.75 },
+          { max: Infinity, annualPercent: 9.75 }
+        ]
+      }
+    }
+  ];
+
+  function getBrokerInfo(id) {
+    return brokerCatalog.find(b => b.id === id) || brokerCatalog[0];
+  }
+
+  function getBrokerDisplayName(id) {
+    const info = getBrokerInfo(id);
+    if (info) return info.name;
+    return id || 'Pocketfull';
+  }
+
+  function calculateBrokerDailyPercent(brokerId, mtfAmount = 0) {
+    const info = getBrokerInfo(brokerId);
+    if (!info) return 0.035;
+    const strategy = info.rateStrategy || { type: 'flat_percent', percentPerDay: info.rate || 0.035 };
+    const amount = Number(mtfAmount) || 0;
+    
+    const resolveTier = (tiers) => {
+      if (!Array.isArray(tiers) || tiers.length === 0) return null;
+      return tiers.find(tier => amount <= tier.max) || tiers[tiers.length - 1];
+    };
+    
+    switch (strategy.type) {
+      case 'tiered_per_lakh': {
+        const tier = resolveTier(strategy.tiers);
+        const perDayPerLakh = tier?.perDayPerLakh ?? 35;
+        return (perDayPerLakh / 100000) * 100;
+      }
+      case 'annual_tiered_percent': {
+        const tier = resolveTier(strategy.tiers);
+        const annualPercent = tier?.annualPercent ?? 13;
+        return annualPercent / 365;
+      }
+      case 'flat_percent':
+      default: {
+        return strategy.percentPerDay ?? strategy.rate ?? 0.035;
+      }
+    }
+  }
+
+  // Company search data - Top NSE stocks for autocomplete
+  const stockDatabase = [
+    {symbol: 'RELIANCE', name: 'Reliance Industries Limited'},
+    {symbol: 'TCS', name: 'Tata Consultancy Services'},
+    {symbol: 'HDFCBANK', name: 'HDFC Bank Limited'},
+    {symbol: 'INFY', name: 'Infosys Limited'},
+    {symbol: 'ICICIBANK', name: 'ICICI Bank Limited'},
+    {symbol: 'HINDUNILVR', name: 'Hindustan Unilever Limited'},
+    {symbol: 'ITC', name: 'ITC Limited'},
+    {symbol: 'SBIN', name: 'State Bank of India'},
+    {symbol: 'BHARTIARTL', name: 'Bharti Airtel Limited'},
+    {symbol: 'KOTAKBANK', name: 'Kotak Mahindra Bank'},
+    {symbol: 'LT', name: 'Larsen & Toubro Limited'},
+    {symbol: 'AXISBANK', name: 'Axis Bank Limited'},
+    {symbol: 'BAJFINANCE', name: 'Bajaj Finance Limited'},
+    {symbol: 'ASIANPAINT', name: 'Asian Paints Limited'},
+    {symbol: 'MARUTI', name: 'Maruti Suzuki India Limited'},
+    {symbol: 'HCLTECH', name: 'HCL Technologies Limited'},
+    {symbol: 'WIPRO', name: 'Wipro Limited'},
+    {symbol: 'ULTRACEMCO', name: 'UltraTech Cement Limited'},
+    {symbol: 'TITAN', name: 'Titan Company Limited'},
+    {symbol: 'NESTLEIND', name: 'Nestle India Limited'},
+    {symbol: 'TATAMOTORS', name: 'Tata Motors Limited'},
+    {symbol: 'TATASTEEL', name: 'Tata Steel Limited'},
+    {symbol: 'SUNPHARMA', name: 'Sun Pharmaceutical Industries'},
+    {symbol: 'ONGC', name: 'Oil & Natural Gas Corporation'},
+    {symbol: 'NTPC', name: 'NTPC Limited'},
+    {symbol: 'POWERGRID', name: 'Power Grid Corporation'},
+    {symbol: 'M&M', name: 'Mahindra & Mahindra Limited'},
+    {symbol: 'ADANIPORTS', name: 'Adani Ports & SEZ Limited'},
+    {symbol: 'JSWSTEEL', name: 'JSW Steel Limited'},
+    {symbol: 'INDUSINDBK', name: 'IndusInd Bank Limited'}
+  ];
+
+  // Autocomplete functionality
+  const searchInput = document.getElementById('companySearch');
+  const dropdown = document.getElementById('autocompleteDropdown');
+  const symbolInput = document.getElementById('symbol');
+  const companyInput = document.getElementById('company');
+  const brokerSelect = document.getElementById('broker');
+  const mtfEnabledToggle = document.getElementById('mtfEnabled');
+  const interestInput = document.getElementById('interest');
+  const mtfFundsInput = document.getElementById('mtfFunds');
+
+  function populateBrokerOptions() {
+    if (!brokerSelect) return;
+    brokerSelect.innerHTML = brokerCatalog.map((broker, index) => `
+      <option value="${broker.id}" ${index === 0 ? 'selected' : ''}>
+        ${broker.name} (${calculateBrokerDailyPercent(broker.id, 100000).toFixed(3)}%/day est.)
+      </option>
+    `).join('');
+  }
+
+  function updateInterestFromInputs() {
+    if (!interestInput || !mtfFundsInput || !mtfEnabledToggle) return;
+    if (!mtfEnabledToggle.checked) {
+      interestInput.value = '0';
+      return;
+    }
+    const brokerId = brokerSelect ? brokerSelect.value : brokerCatalog[0].id;
+    const amount = parseFloat(mtfFundsInput.value || '0');
+    const percent = calculateBrokerDailyPercent(brokerId, amount);
+    interestInput.value = percent.toFixed(3);
+  }
+
+  function applyMTFState() {
+    if (!mtfEnabledToggle || !mtfFundsInput || !interestInput) return;
+    const enabled = mtfEnabledToggle.checked;
+    if (enabled) {
+      mtfFundsInput.removeAttribute('disabled');
+      interestInput.removeAttribute('disabled');
+      updateInterestFromInputs();
+    } else {
+      mtfFundsInput.value = '0';
+      mtfFundsInput.setAttribute('disabled', 'disabled');
+      interestInput.value = '0';
+      interestInput.setAttribute('disabled', 'disabled');
+    }
+  }
+
+  function handleBrokerChange() {
+    if (!brokerSelect || !interestInput) return;
+    updateInterestFromInputs();
+  }
+
+  searchInput.addEventListener('input', function() {
+    const query = this.value.toLowerCase().trim();
+    if (query.length < 2) {
+      dropdown.style.display = 'none';
+      return;
+    }
+    const matches = stockDatabase.filter(stock => 
+      stock.name.toLowerCase().includes(query) || 
+      stock.symbol.toLowerCase().includes(query)
+    ).slice(0, 8);
+    
+    if (matches.length === 0) {
+      dropdown.style.display = 'none';
+      return;
+    }
+    
+    dropdown.innerHTML = matches.map(stock => `
+      <div class="autocomplete-item" data-symbol="${stock.symbol}" data-name="${stock.name}">
+        <strong>${stock.symbol}</strong>
+        <small>${stock.name}</small>
+      </div>
+    `).join('');
+    dropdown.style.display = 'block';
+    
+    document.querySelectorAll('.autocomplete-item').forEach(item => {
+      item.addEventListener('click', function() {
+        symbolInput.value = this.dataset.symbol;
+        companyInput.value = this.dataset.name;
+        searchInput.value = this.dataset.name;
+        dropdown.style.display = 'none';
+      });
+    });
+  });
+
+  if (brokerSelect) {
+    brokerSelect.addEventListener('change', handleBrokerChange);
+  }
+  if (mtfEnabledToggle) {
+    mtfEnabledToggle.addEventListener('change', applyMTFState);
+  }
+  if (mtfFundsInput) {
+    mtfFundsInput.addEventListener('input', updateInterestFromInputs);
+  }
+
+  document.addEventListener('click', function(e) {
+    if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.style.display = 'none';
+    }
+  });
+
+  // Enhance fetch with optional public proxy for CORS-restricted origins
+  const corsProxies = [
+    'https://thingproxy.freeboard.io/fetch/',
+    'https://api.allorigins.win/raw?url=',
+    'https://cors.isomorphic-git.org/'
+  ];
+
+  async function fetchWithOptionalProxy(url, options = {}) {
+    try {
+      const res = await fetch(url, options);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res;
+    } catch (err) {
+      for (const proxy of corsProxies) {
+        try {
+          const proxyRes = await fetch(proxy + encodeURIComponent(url), options);
+          if (proxyRes.ok) {
+            return proxyRes;
+          }
+        } catch (_) {
+          // try next proxy
+        }
+      }
+      throw err;
+    }
+  }
+
+  // Enhanced price fetch with multiple fallback APIs and comprehensive error handling
+  async function fetchNSEPrice(symbol) {
+    if (!symbol) return null;
+    
+    const cleanSymbol = symbol.replace('.NS', '').toUpperCase();
+    
+    // Try multiple APIs in sequence for reliability
+    const apis = [
+      // API 1: Yahoo Finance (most reliable)
+      async () => {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${cleanSymbol}.NS?interval=1d&range=5d`;
+        const res = await fetchWithOptionalProxy(url, {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+          }
+        });
+        if (!res.ok) throw new Error('Yahoo API failed');
+        const data = await res.json();
+        const meta = data?.chart?.result?.[0]?.meta || {};
+        let price = meta.regularMarketPrice ?? meta.previousClose ?? meta.chartPreviousClose;
+        if (!price) {
+          const closes = data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || [];
+          price = closes.filter(v => typeof v === 'number' && !isNaN(v)).pop();
+        }
+        if (!price) throw new Error('No price data');
+        return Number(price);
+      },
+      
+      // API 2: Alternative NSE data source
+      async () => {
+        const url = `https://www.nseindia.com/api/quote-equity?symbol=${cleanSymbol}`;
+        const res = await fetchWithOptionalProxy(url, {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0'
+          }
+        });
+        if (!res.ok) throw new Error('NSE API failed');
+        const data = await res.json();
+        const price = data?.priceInfo?.lastPrice || data?.priceInfo?.previousClose || data?.lastPrice;
+        if (!price) throw new Error('No price data');
+        return Number(price);
+      },
+      
+      // API 3: MoneyControl (original)
+      async () => {
+        const url = `https://priceapi.moneycontrol.com/pricefeed/nse/equitycash/${cleanSymbol}`;
+        const res = await fetchWithOptionalProxy(url, {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0'
+          }
+        });
+        if (!res.ok) throw new Error('MoneyControl API failed');
+        const data = await res.json();
+        const price = data?.data?.pricecurrent || data?.data?.priceprevclose || data?.pricecurrent;
+        if (!price) throw new Error('No price data');
+        return Number(price);
+      }
+    ];
+    
+    // Try each API until one succeeds
+    for (let i = 0; i < apis.length; i++) {
+      try {
+        const price = await apis[i]();
+        if (price && !isNaN(price) && price > 0) {
+          console.log(`✓ Price fetched for ${cleanSymbol}: ₹${price} (API ${i+1})`);
+          return price;
+        }
+      } catch (error) {
+        console.warn(`API ${i+1} failed for ${cleanSymbol}:`, error.message);
+        // Continue to next API
+      }
+    }
+    
+    // All APIs failed
+    console.error(`✗ All APIs failed for symbol: ${cleanSymbol}`);
+    return null;
+  }
+
+  // STATE
+  let portfolio = [];
+  let currentUser = null;
+  let currentUserDisplayName = '';
+  const STORAGE_KEYS = {
+    USERS: 'stockapp_users',
+    CURRENT_USER: 'stockapp_current_user',
+    CURRENT_USER_DISPLAY: 'stockapp_current_user_display',
+    REMEMBERED_USERS: 'stockapp_remembered_users',
+    REMEMBERED_LAST: 'stockapp_last_remembered_user'
+  };
+  const LOGIN_SECURITY = {
+    maxAttempts: 5,
+    lockoutMinutes: 5
+  };
+
+  // ====== HELPERS ======
+  function normalizeUsername(username = '') {
+    return username.trim().toLowerCase();
+  }
+
+  function getUsers() {
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '{}');
+  }
+
+  function saveUsers(users) {
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+  }
+
+  function getRememberedUsers() {
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.REMEMBERED_USERS) || '{}');
+  }
+
+  function saveRememberedUsers(data) {
+    localStorage.setItem(STORAGE_KEYS.REMEMBERED_USERS, JSON.stringify(data));
+  }
+
+  function isUserRemembered(username) {
+    const remembered = getRememberedUsers();
+    return !!remembered[username];
+  }
+
+  function setUserRemembered(username, remember) {
+    const remembered = getRememberedUsers();
+    if (remember) {
+      remembered[username] = true;
+      localStorage.setItem(STORAGE_KEYS.REMEMBERED_LAST, username);
+    } else {
+      delete remembered[username];
+      const last = localStorage.getItem(STORAGE_KEYS.REMEMBERED_LAST);
+      if (last === username) {
+        localStorage.removeItem(STORAGE_KEYS.REMEMBERED_LAST);
+      }
+    }
+    saveRememberedUsers(remembered);
+  }
+
+  function showLoginError(message, type = 'error') {
+    const errorElem = document.getElementById('loginError');
+    const colors = {
+      error: { text: 'var(--color-danger)', bg: 'rgba(245, 101, 101, 0.1)' },
+      warning: { text: 'var(--color-warning)', bg: 'rgba(237, 137, 54, 0.1)' },
+      success: { text: 'var(--color-success)', bg: 'rgba(72, 187, 120, 0.1)' }
+    };
+    const palette = colors[type] || colors.error;
+    errorElem.innerText = message;
+    errorElem.style.display = 'block';
+    errorElem.style.color = palette.text;
+    errorElem.style.background = palette.bg;
+  }
+
+  function setLoginButtonBusy(isBusy) {
+    const btn = document.getElementById('loginButton');
+    if (!btn) return;
+    btn.disabled = isBusy;
+    btn.style.opacity = isBusy ? '0.7' : '1';
+    btn.innerText = isBusy ? 'Signing in...' : 'Sign in';
+  }
+
+  function resolveUserRecord(users, username) {
+    if (users[username]) {
+      return { key: username, record: users[username] };
+    }
+    const normalized = normalizeUsername(username);
+    if (users[normalized]) {
+      return { key: normalized, record: users[normalized] };
+    }
+    return { key: normalized, record: null };
+  }
+
+  function promptRememberDevice(username) {
+    if (isUserRemembered(username)) return;
+    const remember = confirm("Remember this device so you don't have to enter your password next time?");
+    if (remember) {
+      setUserRemembered(username, true);
+      alert("✅ We'll keep you signed in on this device. Logout anytime to switch accounts.");
+    }
+  }
+
+  // ====== USER AUTHENTICATION ======
+  // Password hashing using SHA-256
+  async function hashPassword(password) {
+    const msgBuffer = new TextEncoder().encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+  }
+
+  // Show/hide forms
+  function showSignupForm() {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('signupScreen').style.display = 'block';
+  }
+
+  function showLoginForm() {
+    document.getElementById('signupScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'block';
+  }
+
+  async function handleLogin() {
+    const usernameInput = document.getElementById('loginUsername');
+    const passwordInput = document.getElementById('loginPassword');
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
+    document.getElementById('loginError').style.display = 'none';
+    
+    if (!username) {
+      showLoginError("⚠️ Please enter your username", 'warning');
+      return;
+    }
+    
+    if (username.length < 3) {
+      showLoginError("⚠️ Username must be at least 3 characters long", 'warning');
+      return;
+    }
+    
+    setLoginButtonBusy(true);
+    try {
+      const users = getUsers();
+      const { key, record } = resolveUserRecord(users, username);
+      
+      if (!record) {
+        showLoginError("❌ Account not found. Please create a new account.");
+        return;
+      }
+      
+      if (record.lockedUntil && Date.now() < record.lockedUntil) {
+        const minutesLeft = Math.ceil((record.lockedUntil - Date.now()) / 60000);
+        showLoginError(`⏳ Too many attempts. Try again in ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'}.`, 'warning');
+        return;
+      }
+      
+      const rememberedBypass = isUserRemembered(key);
+      if (!password && !rememberedBypass) {
+        showLoginError("⚠️ Please enter your password or enable Remember Me first.", 'warning');
+        return;
+      }
+      
+      let passwordValid = rememberedBypass;
+      if (!rememberedBypass) {
+        const hashedPassword = await hashPassword(password);
+        passwordValid = record.password === hashedPassword;
+      }
+      
+      if (!passwordValid) {
+        record.failedAttempts = (record.failedAttempts || 0) + 1;
+        if (record.failedAttempts >= LOGIN_SECURITY.maxAttempts) {
+          record.lockedUntil = Date.now() + LOGIN_SECURITY.lockoutMinutes * 60000;
+          showLoginError(`⛔ Account locked for ${LOGIN_SECURITY.lockoutMinutes} minutes due to repeated failures.`);
+        } else {
+          const remaining = LOGIN_SECURITY.maxAttempts - record.failedAttempts;
+          showLoginError(`❌ Incorrect password. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`);
+        }
+        saveUsers(users);
+        return;
+      }
+      
+      // Successful login
+      record.failedAttempts = 0;
+      delete record.lockedUntil;
+      record.lastLogin = new Date().toISOString();
+      saveUsers(users);
+      
+      usernameInput.value = '';
+      passwordInput.value = '';
+      
+      currentUser = key;
+      currentUserDisplayName = record.displayName || username;
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, key);
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_DISPLAY, currentUserDisplayName);
+      
+      loadUserData();
+      showMainApp();
+      promptRememberDevice(key);
+    } catch (err) {
+      console.error('Login failed:', err);
+      showLoginError("❌ Something went wrong while signing in. Please try again.");
+    } finally {
+      setLoginButtonBusy(false);
+    }
+  }
+  
+  async function handleSignup() {
+    const usernameRaw = document.getElementById('signupUsername').value.trim();
+    const username = usernameRaw;
+    const password = document.getElementById('signupPassword').value;
+    const confirmPassword = document.getElementById('signupPasswordConfirm').value;
+    const errorElem = document.getElementById('signupError');
+    
+    errorElem.style.display = 'none';
+    
+    // Basic validation
+    if (!username || !password || !confirmPassword) {
+      errorElem.innerText = "⚠️ Please fill all fields";
+      errorElem.style.display = 'block';
+      return;
+    }
+    
+    if (password !== confirmPassword) {
+      errorElem.innerText = "⚠️ Passwords do not match";
+      errorElem.style.display = 'block';
+      return;
+    }
+    
+    const users = getUsers();
+    const normalized = normalizeUsername(username);
+    if (users[username] || users[normalized]) {
+      errorElem.innerText = "❌ Username already exists. Please choose another or sign in.";
+      errorElem.style.display = 'block';
+      return;
+    }
+    
+    // Create new user with hashed password
+    const hashedPassword = await hashPassword(password);
+    users[normalized] = {
+      password: hashedPassword,
+      created: new Date().toISOString(),
+      lastLogin: new Date().toISOString(),
+      displayName: username,
+      failedAttempts: 0
+    };
+    
+    saveUsers(users);
+    localStorage.setItem(`stockapp_portfolio_${normalized}`, JSON.stringify([]));
+    
+    // Clear signup form fields
+    document.getElementById('signupUsername').value = '';
+    document.getElementById('signupPassword').value = '';
+    document.getElementById('signupPasswordConfirm').value = '';
+    const strengthMeterSignup = document.getElementById('passwordStrength');
+    if (strengthMeterSignup) strengthMeterSignup.style.display = 'none';
+    
+    currentUser = normalized;
+    currentUserDisplayName = username;
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, normalized);
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_DISPLAY, username);
+    loadUserData();
+    showMainApp();
+  }
+
+  function handleLogout() {
+    saveUserData();
+    currentUser = null;
+    currentUserDisplayName = '';
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_DISPLAY);
+    portfolio = [];
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('signupScreen').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'block';
+    
+    // Clear all login/signup form fields for security
+    document.getElementById('loginUsername').value = '';
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('signupUsername').value = '';
+    document.getElementById('signupPassword').value = '';
+    document.getElementById('signupPasswordConfirm').value = '';
+    const strengthMeterLogout = document.getElementById('passwordStrength');
+    if (strengthMeterLogout) strengthMeterLogout.style.display = 'none';
+    if (mtfEnabledToggle) {
+      mtfEnabledToggle.checked = true;
+      applyMTFState();
+    }
+    handleBrokerChange();
+    
+    // Clear error messages
+    document.getElementById('loginError').innerText = '';
+    document.getElementById('loginError').style.display = 'none';
+    document.getElementById('signupError').innerText = '';
+    document.getElementById('signupError').style.display = 'none';
+  }
+
+  function showMainApp() {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('signupScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+    document.getElementById('displayUsername').innerText = currentUserDisplayName || currentUser || '';
+    renderPortfolio();
+  }
+
+  function saveUserData() {
+    if (currentUser) {
+      localStorage.setItem(`stockapp_portfolio_${currentUser}`, JSON.stringify(portfolio));
+    }
+  }
+
+  function loadUserData() {
+    if (currentUser) {
+      const saved = localStorage.getItem(`stockapp_portfolio_${currentUser}`);
+      portfolio = saved ? JSON.parse(saved) : [];
+      portfolio = portfolio.map(stock => {
+        const broker = stock.broker || 'POCKETFULL';
+        const mtfFundsValue = Number(stock.mtfFunds || 0);
+        const isMTF = typeof stock.isMTF === 'boolean' ? stock.isMTF : mtfFundsValue > 0;
+        const computedRate = calculateBrokerDailyPercent(broker, mtfFundsValue);
+        return {
+          ...stock,
+          broker,
+          isMTF,
+          interest: isMTF ? Number(stock.interest ?? computedRate) : 0,
+          mtfFunds: isMTF ? mtfFundsValue : 0
+        };
+      });
+    }
+  }
+
+  function autoLoginRememberedUser() {
+    const remembered = getRememberedUsers();
+    let rememberedUser = localStorage.getItem(STORAGE_KEYS.REMEMBERED_LAST);
+    if (!rememberedUser || !remembered[rememberedUser]) {
+      rememberedUser = Object.keys(remembered)[0];
+    }
+    if (!rememberedUser) return false;
+    const users = getUsers();
+    const record = users[rememberedUser];
+    if (!record) {
+      setUserRemembered(rememberedUser, false);
+      return false;
+    }
+    currentUser = rememberedUser;
+    currentUserDisplayName = record.displayName || rememberedUser;
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, rememberedUser);
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_DISPLAY, currentUserDisplayName);
+    loadUserData();
+    showMainApp();
+    return true;
+  }
+
+  // Auto-save every 30 seconds
+  setInterval(() => {
+    if (currentUser && portfolio.length > 0) {
+      saveUserData();
+      console.log('✓ Portfolio auto-saved');
+    }
+  }, 30000);
+
+  function formatCurrency(val) {
+    return (val == null || val === "") ? "" : "₹" + Number(val).toLocaleString("en-IN", {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+  function formatPercent(val, digits = 2) {
+    if (val == null || val === "" || isNaN(val)) return "0%";
+    return Number(val).toFixed(digits) + "%";
+  }
+  function todayISO() {
+    return (new Date()).toISOString().split("T")[0];
+  }
+
+  // INTERFACE
+  document.getElementById('addForm').onsubmit = async function(e){
+    e.preventDefault();
+    const errorElem = document.getElementById('errorMsg');
+    errorElem.innerText = "";
+    errorElem.style.color = "var(--color-danger)";
+
+    let symbol = document.getElementById('symbol').value.trim().toUpperCase();
+    let company = document.getElementById('company').value.trim();
+    const brokerId = brokerSelect ? brokerSelect.value : brokerCatalog[0].id;
+    const brokerInfo = getBrokerInfo(brokerId);
+    const isMTF = mtfEnabledToggle.checked;
+    
+    if (!symbol || !company) {
+      errorElem.innerText = "⚠️ Please search and select a company first!";
+      return;
+    }
+    let entryDate = document.getElementById('entryDate').value;
+    let entryPrice = parseFloat(document.getElementById('entryPrice').value || 0);
+    let quantity = parseInt(document.getElementById('quantity').value || 0);
+    let ownCapital = parseFloat(document.getElementById('ownCapital').value || 0);
+    let mtfFunds = isMTF ? parseFloat(document.getElementById('mtfFunds').value || 0) : 0;
+    let interest = isMTF ? parseFloat(document.getElementById('interest').value || calculateBrokerDailyPercent(brokerId, mtfFunds)) : 0;
+    let totalInvestment = entryPrice * quantity;
+    
+    // Comprehensive validation
+    if (!symbol || !company || !entryDate || !entryPrice || !quantity || !ownCapital) {
+      errorElem.innerText = "⚠️ Please fill all required fields.";
+      return;
+    }
+    if (ownCapital < 0) {
+      errorElem.innerText = "⚠️ Own capital must be positive!";
+      return;
+    }
+    if (isMTF && mtfFunds < 0) {
+      errorElem.innerText = "⚠️ MTF funds must be positive when MTF is enabled!";
+      return;
+    }
+    if (entryPrice <= 0) {
+      errorElem.innerText = "⚠️ Entry price must be greater than zero!";
+      return;
+    }
+    if (quantity <= 0) {
+      errorElem.innerText = "⚠️ Quantity must be at least 1!";
+      return;
+    }
+    if (isMTF && ownCapital + mtfFunds < totalInvestment * 0.9) {
+      errorElem.innerText = "⚠️ Warning: Own capital + MTF funds seems insufficient for total investment!";
+    }
+    
+    // Show loading state
+    errorElem.innerText = "⏳ Fetching live price for " + symbol + "...";
+    errorElem.style.color = "var(--color-info)";
+    
+    // Fetch current price with error handling
+    let currentPrice = null;
+    try {
+      currentPrice = await fetchNSEPrice(symbol.replace(".NS", ""));
+    } catch (error) {
+      errorElem.innerText = "❌ Error fetching price: " + error.message;
+      errorElem.style.color = "var(--color-danger)";
+      return;
+    }
+    
+    if (currentPrice === null || currentPrice <= 0) {
+      errorElem.innerText = `❌ Couldn't fetch live price for ${symbol}. Please verify the stock symbol is correct (e.g., RELIANCE, TCS, TATASTEEL). You can still add manually by entering a current price estimate.`;
+      errorElem.style.color = "var(--color-danger)";
+      
+      // Offer to use entry price as fallback
+      const useEntryPrice = confirm(`Price fetch failed for ${symbol}.\n\nWould you like to use entry price (₹${entryPrice}) as current price for now?\n\nYou can update it later when live prices work.`);
+      if (!useEntryPrice) return;
+      currentPrice = entryPrice;
+      errorElem.innerText = "⚠️ Using entry price as current price (price fetch unavailable).";
+      errorElem.style.color = "var(--color-warning)";
+    } else {
+      errorElem.innerText = "✓ Live price fetched successfully: ₹" + currentPrice.toFixed(2);
+      errorElem.style.color = "var(--color-success)";
+    }
+    let leverage = (ownCapital > 0) ? (totalInvestment / ownCapital) : 0;
+    let daysHeld = Math.max(1, Math.ceil((new Date(todayISO()) - new Date(entryDate)) / 86400000));
+    let currentValue = currentPrice * quantity;
+    let totalPL = currentValue - totalInvestment;
+    let plPc = (totalInvestment > 0) ? (100 * totalPL / totalInvestment) : 0;
+    let totalInterest = (mtfFunds * interest * daysHeld) / 100;
+    let netPL = totalPL - totalInterest;
+    let netROI = (ownCapital > 0) ? (100 * netPL / ownCapital) : 0;
+    let status = netPL > 0 ? "Profit" : (netPL < 0 ? "Loss" : "Neutral");
+
+    portfolio.push({
+      symbol, company, broker: brokerId, isMTF,
+      entryDate, entryPrice, quantity, ownCapital, mtfFunds,
+      totalInvestment, leverage, currentPrice, currentValue, totalPL, plPc, daysHeld,
+      interest, totalInterest, netPL, netROI, status
+    });
+    saveUserData();
+    await renderPortfolio();
+    this.reset();
+    if (brokerSelect) brokerSelect.value = brokerCatalog[0].id;
+    if (mtfEnabledToggle) mtfEnabledToggle.checked = true;
+    handleBrokerChange();
+    applyMTFState();
+    document.getElementById('entryDate').value = todayISO();
+  }
+
+  async function fetchAllPrices() {
+    const errors = [];
+    for (let stock of portfolio) {
+      try {
+        const price = await fetchNSEPrice(stock.symbol.replace(".NS", ""));
+        if (price !== null && price > 0) {
+          stock.currentPrice = price;
+        } else {
+          errors.push(stock.symbol);
+          // Keep using last known price if fetch fails
+          console.warn(`Using last known price for ${stock.symbol}`);
+        }
+      } catch (error) {
+        errors.push(stock.symbol);
+        console.error(`Error fetching ${stock.symbol}:`, error);
+      }
+      
+      // Recalculate all metrics with error handling
+      try {
+        stock.currentValue = stock.currentPrice * stock.quantity;
+        stock.totalPL = stock.currentValue - stock.totalInvestment;
+        stock.plPc = stock.totalInvestment > 0 ? (100 * stock.totalPL / stock.totalInvestment) : 0;
+        stock.daysHeld = Math.max(1, Math.ceil((new Date(todayISO()) - new Date(stock.entryDate)) / 86400000));
+        stock.totalInterest = (stock.mtfFunds * stock.interest * stock.daysHeld) / 100;
+        stock.netPL = stock.totalPL - stock.totalInterest;
+        stock.netROI = stock.ownCapital > 0 ? (100 * stock.netPL / stock.ownCapital) : 0;
+        stock.status = stock.netPL > 0 ? "Profit" : (stock.netPL < 0 ? "Loss" : "Neutral");
+      } catch (calcError) {
+        console.error(`Calculation error for ${stock.symbol}:`, calcError);
+      }
+    }
+    
+    if (errors.length > 0) {
+      console.warn(`⚠️ Price fetch failed for: ${errors.join(', ')}`);
+    }
+  }
+
+  async function renderPortfolio() {
+    await fetchAllPrices();
+    const tbody = document.getElementById('portfolioBody');
+    tbody.innerHTML = "";
+    for (let [i, stock] of portfolio.entries()) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${stock.symbol}</td>
+        <td>${stock.company}</td>
+        <td>${getBrokerDisplayName(stock.broker)}</td>
+        <td>${stock.entryDate}</td>
+        <td>${formatCurrency(stock.entryPrice)}</td>
+        <td>${stock.quantity}</td>
+        <td>${formatCurrency(stock.ownCapital)}</td>
+        <td>${formatCurrency(stock.mtfFunds)}</td>
+        <td>${formatCurrency(stock.totalInvestment)}</td>
+        <td>${stock.leverage.toFixed(2)}</td>
+        <td>${formatCurrency(stock.currentPrice)}</td>
+        <td>${formatCurrency(stock.currentValue)}</td>
+        <td class="${stock.totalPL > 0 ? 'status-profit' : stock.totalPL < 0 ? 'status-loss' : 'status-neutral'}">${formatCurrency(stock.totalPL)}</td>
+        <td>${stock.plPc.toFixed(2)}%</td>
+        <td>${stock.daysHeld}</td>
+        <td>${formatCurrency(stock.totalInterest)}</td>
+        <td class="${stock.netPL > 0 ? 'status-profit' : stock.netPL < 0 ? 'status-loss' : 'status-neutral'}">${formatCurrency(stock.netPL)}</td>
+        <td>${stock.netROI.toFixed(2)}%</td>
+        <td>${stock.status}</td>
+        <td><button class="delete-btn" title="Delete" onclick="deleteStock(${i})">✖</button></td>
+      `;
+      tbody.appendChild(tr);
+    }
+    renderSummary();
+    renderInsights();
+  }
+
+  function deleteStock(index) {
+    portfolio.splice(index,1);
+    saveUserData();
+    renderPortfolio();
+  }
+  window.deleteStock = deleteStock;
+
+  function renderSummary() {
+    const wrap = document.getElementById('summaryWrap');
+    if (portfolio.length === 0) { wrap.innerHTML = ""; return; }
+    const totalOwn = portfolio.reduce((a,s)=>a+Number(s.ownCapital),0);
+    const totalMTF = portfolio.reduce((a,s)=>a+Number(s.mtfFunds),0);
+    const totalInv = portfolio.reduce((a,s)=>a+Number(s.totalInvestment),0);
+    const curVal = portfolio.reduce((a,s)=>a+Number(s.currentValue),0);
+    const grossPL = portfolio.reduce((a,s)=>a+Number(s.totalPL),0);
+    const netPL = portfolio.reduce((a,s)=>a+Number(s.netPL),0);
+    const totalInt = portfolio.reduce((a,s)=>a+Number(s.totalInterest),0);
+    const netROI = totalOwn > 0 ? (100*netPL/totalOwn) : 0;
+    const mtfUtilization = 1000000; // Example MTF limit, update as needed
+    wrap.innerHTML = `
+      <div class="summary-card" title="Actual funds deployed">
+        <div class="summary-title">Own Capital Invested</div>
+        <div class="summary-value">${formatCurrency(totalOwn)}</div>
+      </div>
+      <div class="summary-card" title="MTF borrowed">
+        <div class="summary-title">MTF Borrowed</div>
+        <div class="summary-value">${formatCurrency(totalMTF)}</div>
+      </div>
+      <div class="summary-card" title="Total net gain/loss after interest">
+        <div class="summary-title">Net P/L</div>
+        <div class="summary-value" style="color:${netPL>0?"var(--color-success)":netPL<0?"var(--color-danger)":"var(--color-warning)"}">${formatCurrency(netPL)}</div>
+        <div class="summary-detail">Net ROI: ${netROI.toFixed(2)}%</div>
+      </div>
+      <div class="summary-card" title="Current market value">
+        <div class="summary-title">Portfolio Value</div>
+        <div class="summary-value">${formatCurrency(curVal)}</div>
+        <div class="summary-detail">Gross P/L: ${formatCurrency(grossPL)}</div>
+      </div>
+      <div class="summary-card" title="MTF used / available">
+        <div class="summary-title">MTF Utilized</div>
+        <div class="summary-value">${(100*totalMTF/mtfUtilization).toFixed(1)}%</div>
+        <div class="summary-detail">Limit: ₹10,00,000</div>
+      </div>
+      <div class="summary-card" title="Sum of interest paid on MTF">
+        <div class="summary-title">Interest Paid</div>
+        <div class="summary-value">${formatCurrency(totalInt)}</div>
+        <div class="summary-detail">Annualize: ${(totalInt*360/Math.max(1,portfolio[0]?.daysHeld||1)).toFixed(0)}/stock</div>
+      </div>
+    `;
+  }
+
+  function renderInsights() {
+    const wrap = document.getElementById('insightsWrap');
+    if (!wrap) return;
+    if (portfolio.length === 0) { wrap.innerHTML = ""; return; }
+
+    const sortedByNet = [...portfolio].sort((a, b) => b.netPL - a.netPL);
+    const topPerformer = sortedByNet[0];
+    const bottomPerformer = sortedByNet[sortedByNet.length - 1];
+    const highestLeverage = [...portfolio].sort((a, b) => b.leverage - a.leverage)[0];
+    const brokerTotals = portfolio.reduce((acc, stock) => {
+      acc[stock.broker] = (acc[stock.broker] || 0) + Number(stock.mtfFunds || 0);
+      return acc;
+    }, {});
+    const brokerLeaders = Object.entries(brokerTotals).sort((a, b) => b[1] - a[1]);
+    const mtfStocks = portfolio.filter(stock => stock.isMTF && (stock.mtfFunds || 0) > 0);
+    const avgInterest = mtfStocks.length ? mtfStocks.reduce((sum, stock) => sum + Number(stock.interest || 0), 0) / mtfStocks.length : 0;
+    const avgDaysHeld = portfolio.reduce((sum, stock) => sum + Number(stock.daysHeld || 0), 0) / portfolio.length;
+    const mtfVsOwn = (() => {
+      const own = portfolio.reduce((sum, stock) => sum + Number(stock.ownCapital || 0), 0);
+      const mtf = portfolio.reduce((sum, stock) => sum + Number(stock.mtfFunds || 0), 0);
+      const total = own + mtf || 1;
+      return { ratio: (mtf / total) * 100, own, mtf };
+    })();
+
+    wrap.innerHTML = `
+      <div class="insight-card">
+        <div class="insight-title">Top Performer</div>
+        <div class="insight-value">${topPerformer ? topPerformer.symbol : '—'}</div>
+        <div class="insight-meta">${topPerformer ? formatCurrency(topPerformer.netPL) + ' • ' + formatPercent(topPerformer.netROI) : 'Add a stock to see insights'}</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-title">Under Watch</div>
+        <div class="insight-value">${bottomPerformer ? bottomPerformer.symbol : '—'}</div>
+        <div class="insight-meta">${bottomPerformer ? formatCurrency(bottomPerformer.netPL) + ' • ' + formatPercent(bottomPerformer.netROI) : 'No data yet'}</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-title">Highest Leverage</div>
+        <div class="insight-value">${highestLeverage ? highestLeverage.symbol : '—'}</div>
+        <div class="insight-meta">${highestLeverage ? highestLeverage.leverage.toFixed(2) + 'x leverage' : 'Add leveraged trades'}</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-title">MTF Mix</div>
+        <div class="insight-value">${formatPercent(mtfVsOwn.ratio, 1)}</div>
+        <div class="insight-meta">MTF ₹${mtfVsOwn.mtf.toLocaleString('en-IN')} / Own ₹${mtfVsOwn.own.toLocaleString('en-IN')}</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-title">Top Broker Usage</div>
+        <div class="insight-value">${brokerLeaders.length ? getBrokerDisplayName(brokerLeaders[0][0]) : '—'}</div>
+        <div class="insight-meta">${brokerLeaders.length ? formatCurrency(brokerLeaders[0][1]) + ' borrowed' : 'No MTF exposure'}</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-title">Avg Interest • Holding</div>
+        <div class="insight-value">${mtfStocks.length ? formatPercent(avgInterest) : '0%'}</div>
+        <div class="insight-meta">Avg holding ${avgDaysHeld.toFixed(1)} days</div>
+      </div>
+    `;
+  }
+
+  // On load: Check if user is already logged in
+  window.addEventListener('DOMContentLoaded', function() {
+    populateBrokerOptions();
+    handleBrokerChange();
+    applyMTFState();
+    updateInterestFromInputs();
+    const savedUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    const savedDisplay = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_DISPLAY);
+    if (savedUser) {
+      currentUser = savedUser;
+      currentUserDisplayName = savedDisplay || savedUser;
+      loadUserData();
+      showMainApp();
+    } else {
+      const autoLogged = autoLoginRememberedUser();
+      if (!autoLogged) {
+        showLoginForm();
+      }
+    }
+    document.getElementById('entryDate').value = todayISO();
+  });
+
+  // Auto-refresh every 2 min to simulate live prices (can be user-adjusted)
+  setInterval(()=>{
+    if(portfolio.length>0){renderPortfolio();}
+  },120000);
+</script>
+</body>
+</html>
