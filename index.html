@@ -453,10 +453,11 @@
           <label for="companySearch">Search Company Name</label>
           <input type="text" id="companySearch" placeholder="Type company name..." autocomplete="off">
           <div id="autocompleteDropdown" class="autocomplete-dropdown" style="display:none;"></div>
+          <small id="searchStatus" style="color:var(--color-text-light);font-size:12px;display:block;margin-top:4px;">Type at least 2 characters to search NSE listings.</small>
         </div>
         <div class="form-group">
           <label for="symbol">Stock Symbol (NSE)</label>
-          <input type="text" id="symbol" placeholder="Auto-filled" readonly style="background:#f7fafc;">
+          <input type="text" id="symbol" placeholder="Type or auto-filled" style="background:#f7fafc;">
         </div>
         <div class="form-group">
           <label for="company">Company Name</label>
@@ -731,6 +732,33 @@
     URL.revokeObjectURL(url);
   }
 
+  function setSearchStatus(message, tone = 'info') {
+    if (!searchStatus) return;
+    const colors = {
+      info: 'var(--color-text-light)',
+      success: 'var(--color-success)',
+      warning: 'var(--color-warning)',
+      error: 'var(--color-danger)'
+    };
+    searchStatus.style.color = colors[tone] || colors.info;
+    searchStatus.innerText = message;
+  }
+
+  function dedupeSuggestions(list) {
+    const seen = new Set();
+    const result = [];
+    for (const item of list) {
+      const symbol = (item.symbol || '').toUpperCase();
+      if (!symbol || seen.has(symbol)) continue;
+      seen.add(symbol);
+      result.push({
+        symbol,
+        name: item.name || symbol
+      });
+    }
+    return result;
+  }
+
   async function handleUploadCSVFile(file) {
     if (!file) return;
     try {
@@ -767,7 +795,51 @@
     }
   }
 
-  // Company search data - Top NSE stocks for autocomplete
+  function parseCSV(text, delimiter = ',') {
+    const rows = [];
+    let current = '';
+    let row = [];
+    let insideQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      if (char === '"') {
+        if (insideQuotes && text[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          insideQuotes = !insideQuotes;
+        }
+      } else if (char === delimiter && !insideQuotes) {
+        row.push(current.trim());
+        current = '';
+      } else if ((char === '\n' || char === '\r') && !insideQuotes) {
+        if (current || row.length) {
+          row.push(current.trim());
+          rows.push(row);
+        }
+        current = '';
+        row = [];
+        if (char === '\r' && text[i + 1] === '\n') i++;
+      } else {
+        current += char;
+      }
+    }
+    if (current || row.length) {
+      row.push(current.trim());
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  const SEARCH_CONFIG = {
+    minQueryLength: 2,
+    debounceMs: 250
+  };
+
+  let searchDebounceTimer = null;
+  let latestSearchToken = 0;
+
+  // Company search data - fallback list if live search fails
   const stockDatabase = [
     {symbol: 'RELIANCE', name: 'Reliance Industries Limited'},
     {symbol: 'TCS', name: 'Tata Consultancy Services'},
@@ -810,6 +882,7 @@
   const mtfEnabledToggle = document.getElementById('mtfEnabled');
   const interestInput = document.getElementById('interest');
   const mtfFundsInput = document.getElementById('mtfFunds');
+  const searchStatus = document.getElementById('searchStatus');
   const downloadCsvBtn = document.getElementById('downloadCsvBtn');
   const uploadCsvInput = document.getElementById('uploadCsvInput');
 
@@ -834,6 +907,145 @@
     interestInput.value = percent.toFixed(3);
   }
 
+  function setSelectedStock(symbol, name) {
+    if (!symbol || !name) return;
+    const normalizedSymbol = symbol.toUpperCase();
+    symbolInput.value = normalizedSymbol;
+    companyInput.value = name;
+    searchInput.value = name;
+    dropdown.style.display = 'none';
+  }
+
+  function filterLocalStocks(query) {
+    const normalized = query.toLowerCase();
+    return stockDatabase.filter(stock =>
+      stock.name.toLowerCase().includes(normalized) ||
+      stock.symbol.toLowerCase().includes(normalized)
+    ).slice(0, 8);
+  }
+
+  async function fetchSymbolSuggestions(query) {
+    const qLower = query.toLowerCase();
+    const sources = [
+      {
+        name: 'NSE Master List',
+        fetcher: async () => {
+          const url = `https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv`;
+          const res = await fetchWithOptionalProxy(url, { headers: { 'Accept': 'text/csv' } });
+          const text = await res.text();
+          const rows = parseCSV(text, ',');
+          rows.shift();
+          return rows
+            .map(row => ({
+              symbol: row[0],
+              name: row[1]
+            }))
+            .filter(item =>
+              item.symbol &&
+              item.name &&
+              (item.symbol.toLowerCase().includes(qLower) || item.name.toLowerCase().includes(qLower))
+            )
+            .slice(0, 20);
+        }
+      },
+      {
+        name: 'Angel Broking',
+        fetcher: async () => {
+          const url = `https://margincalculator.angelbroking.com/OpenAPI_File/files/NSE_Download.csv`;
+          const res = await fetchWithOptionalProxy(url, { headers: { 'Accept': 'text/csv' } });
+          const text = await res.text();
+          const rows = parseCSV(text, ',');
+          rows.shift();
+          return rows
+            .map(row => ({
+              symbol: row[0],
+              name: row[1]
+            }))
+            .filter(item =>
+              item.symbol &&
+              item.name &&
+              (item.symbol.toLowerCase().includes(qLower) || item.name.toLowerCase().includes(qLower))
+            )
+            .slice(0, 20);
+        }
+      },
+      {
+        name: 'Moneycontrol',
+        fetcher: async () => {
+          const url = `https://priceapi.moneycontrol.com/mcfeed/nse/equitystocklist`;
+          const res = await fetchWithOptionalProxy(url, { headers: { 'Accept': 'application/json' } });
+          const data = await res.json();
+          const list = data?.data || [];
+          return list
+            .map(item => ({
+              symbol: item.SC_NAME?.toUpperCase(),
+              name: item.SC_FULLNM || item.SC_NAME
+            }))
+            .filter(item =>
+              item.symbol &&
+              item.name &&
+              (item.symbol.toLowerCase().includes(qLower) || item.name.toLowerCase().includes(qLower))
+            )
+            .slice(0, 20);
+        }
+      },
+      {
+        name: 'Yahoo Finance',
+        fetcher: async () => {
+          const url = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&lang=en-IN&region=IN`;
+          const res = await fetchWithOptionalProxy(url, {
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'Mozilla/5.0'
+            }
+          });
+          const data = await res.json();
+          const quotes = data?.quotes || [];
+          return quotes
+            .filter(q =>
+              (q.exchDisp || '').toUpperCase().includes('NSE') ||
+              (q.exchange || '').toUpperCase().includes('NS') ||
+              (q.region || '').toUpperCase() === 'IN'
+            )
+            .map(q => ({
+              symbol: (q.symbol || '').replace('.NS', '').toUpperCase(),
+              name: q.shortname || q.longname || q.name || q.symbol || query.toUpperCase()
+            }))
+            .filter(item => item.symbol && item.name)
+            .slice(0, 20);
+        }
+      }
+    ];
+
+    for (const source of sources) {
+      setSearchStatus(`Searching ${source.name}...`, 'info');
+      try {
+        const result = await source.fetcher();
+        if (result && result.length) {
+          setSearchStatus(`Using results from ${source.name}`, 'success');
+          return dedupeSuggestions(result);
+        }
+        setSearchStatus(`No matches from ${source.name}, trying next source...`, 'warning');
+      } catch (err) {
+        console.warn(`${source.name} suggestion source failed:`, err);
+        setSearchStatus(`${source.name} unavailable, trying next source...`, 'warning');
+      }
+    }
+    setSearchStatus('Showing cached suggestions (offline).', 'warning');
+    return dedupeSuggestions(filterLocalStocks(query));
+  }
+
+  async function lookupSymbolDetails(symbol) {
+    const clean = symbol.replace('.NS', '').trim();
+    if (!clean) return null;
+    const suggestions = await fetchSymbolSuggestions(clean);
+    const normalized = clean.toUpperCase();
+    return suggestions.find(s => s.symbol === normalized) ||
+      suggestions.find(s => s.symbol?.startsWith(normalized)) ||
+      suggestions[0] ||
+      null;
+  }
+
   function applyMTFState() {
     if (!mtfEnabledToggle || !mtfFundsInput || !interestInput) return;
     const enabled = mtfEnabledToggle.checked;
@@ -854,38 +1066,69 @@
     updateInterestFromInputs();
   }
 
-  searchInput.addEventListener('input', function() {
-    const query = this.value.toLowerCase().trim();
-    if (query.length < 2) {
-      dropdown.style.display = 'none';
-      return;
-    }
-    const matches = stockDatabase.filter(stock => 
-      stock.name.toLowerCase().includes(query) || 
-      stock.symbol.toLowerCase().includes(query)
-    ).slice(0, 8);
-    
-    if (matches.length === 0) {
-      dropdown.style.display = 'none';
-      return;
-    }
-    
-    dropdown.innerHTML = matches.map(stock => `
-      <div class="autocomplete-item" data-symbol="${stock.symbol}" data-name="${stock.name}">
-        <strong>${stock.symbol}</strong>
-        <small>${stock.name}</small>
-      </div>
-    `).join('');
-    dropdown.style.display = 'block';
-    
-    document.querySelectorAll('.autocomplete-item').forEach(item => {
-      item.addEventListener('click', function() {
-        symbolInput.value = this.dataset.symbol;
-        companyInput.value = this.dataset.name;
-        searchInput.value = this.dataset.name;
+  async function renderSuggestions(query, token) {
+    try {
+      const matches = await fetchSymbolSuggestions(query);
+      if (token !== latestSearchToken) return;
+      if (!matches.length) {
         dropdown.style.display = 'none';
+        return;
+      }
+      dropdown.innerHTML = matches.map(stock => `
+        <div class="autocomplete-item" data-symbol="${stock.symbol}" data-name="${stock.name}">
+          <strong>${stock.symbol}</strong>
+          <small>${stock.name}</small>
+        </div>
+      `).join('');
+      dropdown.style.display = 'block';
+      dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
+        item.addEventListener('click', function() {
+          setSelectedStock(this.dataset.symbol, this.dataset.name);
+        });
       });
-    });
+    } catch (error) {
+      console.error('Autocomplete error:', error);
+      dropdown.style.display = 'none';
+    }
+  }
+
+  searchInput.addEventListener('input', function() {
+    const query = this.value.trim();
+    if (query.length < SEARCH_CONFIG.minQueryLength) {
+      dropdown.style.display = 'none';
+      setSearchStatus('Type at least 2 characters to search NSE listings.', 'info');
+      return;
+    }
+    setSearchStatus('Gathering suggestions...', 'info');
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+      latestSearchToken += 1;
+      renderSuggestions(query, latestSearchToken);
+    }, SEARCH_CONFIG.debounceMs);
+  });
+
+  symbolInput.addEventListener('change', async function() {
+    const value = this.value.trim();
+    if (!value) {
+      companyInput.value = '';
+      setSearchStatus('Enter a symbol or company name to search.', 'info');
+      return;
+    }
+    setSearchStatus('Validating symbol...', 'info');
+    try {
+      const match = await lookupSymbolDetails(value);
+      if (match) {
+        setSelectedStock(match.symbol, match.name);
+        setSearchStatus(`Symbol resolved via live lookup.`, 'success');
+      } else {
+        alert("Couldn't find that symbol on NSE. Please check the value.");
+        companyInput.value = '';
+        setSearchStatus('Symbol not found on any source.', 'error');
+      }
+    } catch (error) {
+      console.error('Symbol lookup failed:', error);
+      setSearchStatus('Symbol lookup failed. Please try again.', 'error');
+    }
   });
 
   if (brokerSelect) {
@@ -915,9 +1158,9 @@
 
   // Enhance fetch with optional public proxy for CORS-restricted origins
   const corsProxies = [
+    'https://functions.yandexcloud.net/d4e8o7c05orql99drbqg?url=',
     'https://thingproxy.freeboard.io/fetch/',
-    'https://api.allorigins.win/raw?url=',
-    'https://cors.isomorphic-git.org/'
+    'https://api.allorigins.win/raw?url='
   ];
 
   async function fetchWithOptionalProxy(url, options = {}) {
