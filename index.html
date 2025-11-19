@@ -304,7 +304,50 @@
       .flex { flex-direction: column; gap: 10px;}
       .portfolio-table th, .portfolio-table td { font-size: 13px;}
     }
+    .chart-grid {
+      margin-top: 32px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    .chart-card {
+      background: rgba(255,255,255,0.95);
+      border-radius: var(--radius);
+      padding: 20px;
+      border: 2px solid var(--color-border);
+      box-shadow: var(--shadow);
+    }
+    .chart-card h3 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      color: var(--color-primary);
+    }
+    .csv-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 16px 0 8px;
+      align-items: center;
+    }
+    .csv-actions button, .csv-actions label {
+      background: rgba(102, 126, 234, 0.12);
+      border: 2px dashed var(--color-primary);
+      color: var(--color-primary);
+      padding: 10px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .csv-actions label {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .csv-actions button:hover, .csv-actions label:hover {
+      background: rgba(102, 126, 234, 0.2);
+    }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.5/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <!-- Login Screen -->
@@ -399,6 +442,12 @@
       Track your leveraged stock positions with live price updates • Broker: <b>Pocketfull</b> • MTF supported
     </p>
     <form id="addForm">
+      <div class="csv-actions" style="margin-bottom: 12px;">
+        <button type="button" id="downloadCsvBtn">⬇ Download CSV</button>
+        <label for="uploadCsvInput">⬆ Upload CSV</label>
+        <input type="file" id="uploadCsvInput" accept=".csv" style="display:none;">
+        <span style="font-size:13px;color:var(--color-text-light);">Quickly backup or import your portfolio data.</span>
+      </div>
       <div class="form-row">
         <div class="form-group" style="position: relative;">
           <label for="companySearch">Search Company Name</label>
@@ -482,6 +531,20 @@
       <!-- Summary cards injected here -->
     </div>
     <div id="insightsWrap" class="insights-grid"></div>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Allocation by Stock</h3>
+        <canvas id="chartAllocation" height="220"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Net P/L by Stock</h3>
+        <canvas id="chartProfit" height="220"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Broker MTF Exposure</h3>
+        <canvas id="chartBroker" height="220"></canvas>
+      </div>
+    </div>
     <p style="margin-top:32px;font-size:14px;color:var(--color-primary);">
       * Live prices fetched from NSE using a public market API (for demo;<br>production: <b>add your Pocketfull API credentials in JS</b>).
       <br>* All calculations update automatically as prices change.
@@ -566,6 +629,144 @@
     }
   }
 
+  function escapeCsvValue(value) {
+    if (value == null) return '';
+    const str = String(value).replace(/"/g, '""');
+    return /[",\n]/.test(str) ? `"${str}"` : str;
+  }
+
+  function buildCsvRow(stock) {
+    return CSV_HEADERS.map(key => {
+      if (key === 'isMTF') return escapeCsvValue(stock.isMTF ? 'true' : 'false');
+      return escapeCsvValue(stock[key]);
+    }).join(',');
+  }
+
+  function splitCsvLine(line) {
+    const result = [];
+    let current = '';
+    let insideQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (insideQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          insideQuotes = !insideQuotes;
+        }
+      } else if (char === ',' && !insideQuotes) {
+        result.push(current);
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current);
+    return result;
+  }
+
+  function normalizeImportedRow(row) {
+    const today = todayISO();
+    const symbol = (row.symbol || '').trim().toUpperCase();
+    const company = (row.company || '').trim();
+    if (!symbol || !company) return null;
+    const broker = row.broker || 'POCKETFULL';
+    const entryDate = row.entryDate || today;
+    const entryPrice = parseFloat(row.entryPrice) || 0;
+    const quantity = parseInt(row.quantity, 10) || 0;
+    const ownCapital = parseFloat(row.ownCapital) || 0;
+    const mtfFunds = parseFloat(row.mtfFunds) || 0;
+    const isMTF = String(row.isMTF).toLowerCase() === 'true' || mtfFunds > 0;
+    const interest = isMTF ? (parseFloat(row.interest) || calculateBrokerDailyPercent(broker, mtfFunds)) : 0;
+    const totalInvestment = entryPrice * quantity;
+    const currentPrice = entryPrice;
+    const currentValue = currentPrice * quantity;
+    const totalPL = currentValue - totalInvestment;
+    const plPc = totalInvestment > 0 ? (100 * totalPL / totalInvestment) : 0;
+    const daysHeld = Math.max(1, Math.ceil((new Date(todayISO()) - new Date(entryDate)) / 86400000));
+    const totalInterest = (mtfFunds * interest * daysHeld) / 100;
+    const netPL = totalPL - totalInterest;
+    const netROI = ownCapital > 0 ? (100 * netPL / ownCapital) : 0;
+    const status = netPL > 0 ? 'Profit' : (netPL < 0 ? 'Loss' : 'Neutral');
+    return {
+      symbol,
+      company,
+      broker,
+      isMTF,
+      entryDate,
+      entryPrice,
+      quantity,
+      ownCapital,
+      mtfFunds,
+      interest,
+      totalInvestment,
+      leverage: ownCapital > 0 ? totalInvestment / ownCapital : 0,
+      currentPrice,
+      currentValue,
+      totalPL,
+      plPc,
+      daysHeld,
+      totalInterest,
+      netPL,
+      netROI,
+      status
+    };
+  }
+
+  function handleDownloadCSV() {
+    if (!portfolio.length) {
+      alert('No portfolio data to export.');
+      return;
+    }
+    const rows = [CSV_HEADERS.join(',')].concat(portfolio.map(buildCsvRow));
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `portfolio-${todayISO()}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleUploadCSVFile(file) {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+      if (lines.length < 2) {
+        alert('CSV file is empty or missing rows.');
+        return;
+      }
+      const headers = splitCsvLine(lines[0]).map(h => h.trim());
+      const imported = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = splitCsvLine(lines[i]);
+        const row = {};
+        headers.forEach((header, idx) => {
+          row[header] = values[idx] || '';
+        });
+        const record = normalizeImportedRow(row);
+        if (record) imported.push(record);
+      }
+      if (!imported.length) {
+        alert('No valid rows found in CSV.');
+        return;
+      }
+      imported.forEach(stock => portfolio.push(stock));
+      saveUserData();
+      renderPortfolio();
+      alert(`Imported ${imported.length} positions successfully.`);
+    } catch (error) {
+      console.error('CSV import failed:', error);
+      alert('Failed to import CSV. Please check the file format.');
+    } finally {
+      uploadCsvInput.value = '';
+    }
+  }
+
   // Company search data - Top NSE stocks for autocomplete
   const stockDatabase = [
     {symbol: 'RELIANCE', name: 'Reliance Industries Limited'},
@@ -609,6 +810,8 @@
   const mtfEnabledToggle = document.getElementById('mtfEnabled');
   const interestInput = document.getElementById('interest');
   const mtfFundsInput = document.getElementById('mtfFunds');
+  const downloadCsvBtn = document.getElementById('downloadCsvBtn');
+  const uploadCsvInput = document.getElementById('uploadCsvInput');
 
   function populateBrokerOptions() {
     if (!brokerSelect) return;
@@ -693,6 +896,15 @@
   }
   if (mtfFundsInput) {
     mtfFundsInput.addEventListener('input', updateInterestFromInputs);
+  }
+  if (downloadCsvBtn) {
+    downloadCsvBtn.addEventListener('click', handleDownloadCSV);
+  }
+  if (uploadCsvInput) {
+    uploadCsvInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      handleUploadCSVFile(file);
+    });
   }
 
   document.addEventListener('click', function(e) {
@@ -813,6 +1025,12 @@
   let portfolio = [];
   let currentUser = null;
   let currentUserDisplayName = '';
+  const chartRefs = {
+    allocation: null,
+    profit: null,
+    broker: null
+  };
+  const CSV_HEADERS = ['symbol','company','broker','isMTF','entryDate','entryPrice','quantity','ownCapital','mtfFunds','interest'];
   const STORAGE_KEYS = {
     USERS: 'stockapp_users',
     CURRENT_USER: 'stockapp_current_user',
@@ -1461,6 +1679,112 @@
         <div class="insight-meta">Avg holding ${avgDaysHeld.toFixed(1)} days</div>
       </div>
     `;
+  }
+
+  function renderCharts() {
+    if (typeof Chart === 'undefined') return;
+    const allocationCtx = document.getElementById('chartAllocation');
+    const profitCtx = document.getElementById('chartProfit');
+    const brokerCtx = document.getElementById('chartBroker');
+    if (!allocationCtx || !profitCtx || !brokerCtx) return;
+
+    const destroyChart = (key) => {
+      if (chartRefs[key]) {
+        chartRefs[key].destroy();
+        chartRefs[key] = null;
+      }
+    };
+
+    if (!portfolio.length) {
+      Object.keys(chartRefs).forEach(destroyChart);
+      ['chartAllocation', 'chartProfit', 'chartBroker'].forEach(id => {
+        const canvas = document.getElementById(id);
+        if (canvas) {
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      });
+      return;
+    }
+
+    const palette = [
+      '#667eea', '#764ba2', '#ed8936', '#48bb78', '#e53e3e',
+      '#38b2ac', '#805ad5', '#f56565', '#4299e1', '#d53f8c'
+    ];
+    const colorAt = (idx) => palette[idx % palette.length];
+
+    destroyChart('allocation');
+    chartRefs.allocation = new Chart(allocationCtx, {
+      type: 'doughnut',
+      data: {
+        labels: portfolio.map(stock => stock.symbol),
+        datasets: [{
+          data: portfolio.map(stock => Number(stock.currentValue || 0)),
+          backgroundColor: portfolio.map((_, idx) => colorAt(idx)),
+          borderWidth: 1
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
+    });
+
+    destroyChart('profit');
+    chartRefs.profit = new Chart(profitCtx, {
+      type: 'bar',
+      data: {
+        labels: portfolio.map(stock => stock.symbol),
+        datasets: [{
+          label: 'Net P/L (₹)',
+          data: portfolio.map(stock => Number(stock.netPL || 0)),
+          backgroundColor: portfolio.map(stock => stock.netPL >= 0 ? 'rgba(72,187,120,0.6)' : 'rgba(245,101,101,0.6)'),
+          borderColor: portfolio.map(stock => stock.netPL >= 0 ? 'rgba(72,187,120,1)' : 'rgba(245,101,101,1)'),
+          borderWidth: 1
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          y: {
+            ticks: {
+              callback: value => `₹${Number(value).toLocaleString('en-IN')}`
+            }
+          }
+        }
+      }
+    });
+
+    const brokerAggregation = portfolio.reduce((acc, stock) => {
+      const key = stock.broker || 'POCKETFULL';
+      acc[key] = (acc[key] || 0) + Number(stock.mtfFunds || 0);
+      return acc;
+    }, {});
+    const brokerEntries = Object.entries(brokerAggregation).filter(([, value]) => value > 0);
+    const brokerLabels = brokerEntries.length ? brokerEntries.map(([key]) => getBrokerDisplayName(key)) : ['No MTF usage'];
+    const brokerValues = brokerEntries.length ? brokerEntries.map(([, value]) => value) : [1];
+
+    destroyChart('broker');
+    chartRefs.broker = new Chart(brokerCtx, {
+      type: 'polarArea',
+      data: {
+        labels: brokerLabels,
+        datasets: [{
+          data: brokerValues,
+          backgroundColor: brokerLabels.map((_, idx) => colorAt(idx)),
+          borderWidth: 1
+        }]
+      },
+      options: {
+        plugins: { legend: { position: 'bottom' } },
+        scales: {
+          r: {
+            ticks: { callback: value => `₹${Number(value).toLocaleString('en-IN')}` }
+          }
+        }
+      }
+    });
   }
 
   // On load: Check if user is already logged in
