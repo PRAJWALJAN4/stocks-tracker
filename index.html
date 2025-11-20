@@ -348,10 +348,52 @@
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.5/dist/chart.umd.min.js"></script>
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://accounts.google.com/gsi/client"></script>
 </head>
 <body>
+  <!-- Device Registration Screen -->
+  <div id="deviceScreen" class="container" style="max-width: 420px; margin-top: 80px; padding: 48px; display: none;">
+    <div id="deviceBackButton" style="margin-bottom: 16px; display: none;">
+      <button onclick="backToApp()" style="background: transparent; border: 1px solid var(--color-border); color: var(--color-text); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 14px;">← Back</button>
+    </div>
+    <div style="text-align: center; margin-bottom: 32px;">
+      <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--color-primary), var(--color-accent)); border-radius: 50%; margin: 0 auto 24px; display: flex; align-items: center; justify-content: center; font-size: 36px;">📱</div>
+      <h1 style="font-size: 28px; margin-bottom: 8px;">Device Management</h1>
+      <p class="subtitle" style="margin: 0;">Optional: Track your registered devices (for information only)</p>
+    </div>
+    
+    <div style="background: rgba(66, 153, 225, 0.1); padding: 12px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid var(--color-info);">
+      <p style="margin: 0; font-size: 13px; color: var(--color-text);">
+        <strong>ℹ️ Note:</strong> Device registration is optional. You can access your portfolio on any device by logging in with your account. This is just for tracking purposes.
+      </p>
+    </div>
+    
+    <div style="margin-bottom: 24px;">
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="deviceName">Device Name (Optional)</label>
+        <input type="text" id="deviceName" placeholder="e.g., My Laptop, Phone, Tablet" style="width: 100%; padding: 14px 16px; font-size: 16px; border: 2px solid var(--color-border); border-radius: 8px;">
+      </div>
+    </div>
+    
+    <div style="margin-bottom: 24px;">
+      <button class="btn" onclick="handleDeviceRegistration()" style="width: 100%; padding: 14px; font-size: 16px; margin: 0;">Register This Device</button>
+    </div>
+    
+    <div id="deviceError" style="color: var(--color-danger); margin-top: 20px; text-align: center; font-size: 14px; padding: 12px; background: rgba(245, 101, 101, 0.1); border-radius: 8px; display: none;"></div>
+    
+    <div id="deviceList" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--color-border);">
+      <p style="font-size: 13px; color: var(--color-text-light); margin-bottom: 12px; text-align: center;">Registered Devices (<span id="deviceCount">0</span>/3)</p>
+      <div id="deviceListItems" style="max-height: 200px; overflow-y: auto;"></div>
+    </div>
+    
+    <p style="text-align: center; margin-top: 32px; font-size: 13px; color: var(--color-text-light);">
+      ⚠️ Maximum 3 devices allowed. Remove old devices to add new ones.
+    </p>
+  </div>
+
   <!-- Login Screen -->
-  <div id="loginScreen" class="container" style="max-width: 420px; margin-top: 80px; padding: 48px;">
+  <div id="loginScreen" class="container" style="max-width: 420px; margin-top: 80px; padding: 48px; display: none;">
     <div style="text-align: center; margin-bottom: 32px;">
       <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--color-primary), var(--color-accent)); border-radius: 50%; margin: 0 auto 24px; display: flex; align-items: center; justify-content: center; font-size: 36px;">📊</div>
       <h1 style="font-size: 28px; margin-bottom: 8px;">Stock Portfolio Tracker</h1>
@@ -435,18 +477,40 @@
       <h1>📊 Stock Portfolio MTF Tracker</h1>
       <div style="display: flex; align-items: center; gap: 16px;">
         <span style="color: var(--color-primary); font-weight: 600;">👤 <span id="displayUsername"></span></span>
+        <button onclick="showDeviceManagement()" style="background: rgba(102, 126, 234, 0.1); color: var(--color-primary); border: 2px solid var(--color-primary); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px;">🔒 Devices</button>
         <button onclick="handleLogout()" style="background: var(--color-danger); color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600;">Logout</button>
       </div>
     </div>
     <p class="subtitle">
       Track your leveraged stock positions with live price updates • Broker: <b>Pocketfull</b> • MTF supported
     </p>
+    <div id="cloudSyncNotification" style="display: none; background: linear-gradient(135deg, rgba(66, 153, 225, 0.1), rgba(102, 126, 234, 0.1)); border: 2px solid var(--color-info); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: start; gap: 16px;">
+        <div style="flex: 1;">
+          <div style="font-weight: 600; color: var(--color-info); margin-bottom: 8px; font-size: 15px;">☁️ Enable Cloud Sync for Multi-Device Access</div>
+          <div style="font-size: 13px; color: var(--color-text); line-height: 1.5;">
+            To access your portfolio from multiple devices, choose a sync method:<br>
+            <strong>Cloud (GitHub):</strong> Free, requires GitHub token<br>
+            <strong>Google Drive:</strong> Use your existing Google account - Click "📁 Upload to Drive" to start
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button onclick="showCloudSettings()" class="btn" style="padding: 8px 16px; font-size: 14px; margin: 0;">⚙️ Setup Cloud Sync</button>
+          <button onclick="document.getElementById('cloudSyncNotification').style.display='none'; localStorage.setItem('stockapp_cloud_sync_notification_dismissed', 'true');" style="background: transparent; border: none; color: var(--color-text-light); cursor: pointer; font-size: 20px; padding: 0; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">×</button>
+        </div>
+      </div>
+    </div>
     <form id="addForm">
       <div class="csv-actions" style="margin-bottom: 12px;">
         <button type="button" id="downloadCsvBtn">⬇ Download CSV</button>
         <label for="uploadCsvInput">⬆ Upload CSV</label>
         <input type="file" id="uploadCsvInput" accept=".csv" style="display:none;">
-        <span style="font-size:13px;color:var(--color-text-light);">Quickly backup or import your portfolio data.</span>
+        <button type="button" id="syncToCloudBtn" title="Upload data to cloud (syncs across devices)">☁️ Upload to Cloud</button>
+        <button type="button" id="syncFromCloudBtn" title="Download data from cloud">⬇ Download from Cloud</button>
+        <button type="button" id="syncToDriveBtn" title="Upload data to Google Drive">📁 Upload to Drive</button>
+        <button type="button" id="syncFromDriveBtn" title="Download data from Google Drive">⬇ Download from Drive</button>
+        <button type="button" id="cloudSettingsBtn" title="Configure cloud sync">⚙️ Cloud Settings</button>
+        <span style="font-size:13px;color:var(--color-text-light);">Backup, import, or sync your portfolio data across devices via Cloud or Google Drive.</span>
       </div>
       <div class="form-row">
         <div class="form-group" style="position: relative;">
@@ -551,6 +615,42 @@
       <br>* All calculations update automatically as prices change.
     </p>
   </div>
+
+  <!-- Cloud Sync Settings Modal -->
+  <div id="cloudSettingsModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+    <div class="container" style="max-width: 500px; margin: auto; position: relative; top: 50%; transform: translateY(-50%);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h2 style="margin: 0;">☁️ Cloud Sync Settings</h2>
+        <button onclick="closeCloudSettings()" style="background: var(--color-danger); color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600;">✖ Close</button>
+      </div>
+      <div style="background: rgba(245, 101, 101, 0.1); padding: 12px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid var(--color-danger);">
+        <p style="margin: 0; font-size: 13px; color: var(--color-text);">
+          <strong>⚠️ Security Note:</strong> Your GitHub token is stored locally in your browser. Never share it publicly.
+        </p>
+      </div>
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label for="githubToken">GitHub Personal Access Token</label>
+        <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" style="width: 100%; padding: 12px; font-size: 14px; border: 2px solid var(--color-border); border-radius: 8px; font-family: monospace;">
+        <small style="color: var(--color-text-light); font-size: 12px; display: block; margin-top: 6px;">
+          Create one at: <a href="https://github.com/settings/tokens" target="_blank" style="color: var(--color-primary);">github.com/settings/tokens</a><br>
+          Required scopes: <code>gist</code> (to create/update gists)
+        </small>
+      </div>
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label for="gistId">Gist ID (Optional - auto-created if empty)</label>
+        <input type="text" id="gistId" placeholder="Leave empty to auto-create" style="width: 100%; padding: 12px; font-size: 14px; border: 2px solid var(--color-border); border-radius: 8px; font-family: monospace;">
+        <small style="color: var(--color-text-light); font-size: 12px; display: block; margin-top: 6px;">
+          If you already have a Gist ID from another device, enter it here to sync to the same location.
+        </small>
+      </div>
+      <div style="display: flex; gap: 12px;">
+        <button onclick="saveCloudSettingsFromModal()" class="btn" style="flex: 1; margin: 0;">💾 Save Settings</button>
+        <button onclick="testCloudConnection()" class="btn" style="flex: 1; margin: 0; background: rgba(102, 126, 234, 0.1); color: var(--color-primary); border: 2px solid var(--color-primary);">🔍 Test Connection</button>
+      </div>
+      <div id="cloudStatus" style="margin-top: 16px; padding: 12px; border-radius: 8px; display: none;"></div>
+    </div>
+  </div>
+
 <script>
   // ====== CONFIGURATION =======
   // By default uses a public NSE API. To connect your own Pocketfull API,
@@ -830,6 +930,577 @@
     }
     return rows;
   }
+
+  // ====== CLOUD SYNC (GitHub Gists) ======
+  const CLOUD_STORAGE_KEY_PREFIX = 'stockapp_cloud_settings_';
+  const CLOUD_GIST_FILENAME = 'portfolio-data.json';
+
+  function getCloudSettings() {
+    // Get cloud settings for current user (per-account)
+    const userKey = currentUser ? `${CLOUD_STORAGE_KEY_PREFIX}${currentUser}` : CLOUD_STORAGE_KEY_PREFIX + 'global';
+    const saved = localStorage.getItem(userKey);
+    return saved ? JSON.parse(saved) : { token: '', gistId: '' };
+  }
+
+  function saveCloudSettings(settings) {
+    // Save cloud settings for current user (per-account)
+    const userKey = currentUser ? `${CLOUD_STORAGE_KEY_PREFIX}${currentUser}` : CLOUD_STORAGE_KEY_PREFIX + 'global';
+    localStorage.setItem(userKey, JSON.stringify(settings));
+  }
+
+  function showCloudSettings() {
+    const settings = getCloudSettings();
+    document.getElementById('githubToken').value = settings.token || '';
+    document.getElementById('gistId').value = settings.gistId || '';
+    document.getElementById('cloudSettingsModal').style.display = 'flex';
+    document.getElementById('cloudStatus').style.display = 'none';
+  }
+  window.showCloudSettings = showCloudSettings;
+
+  function closeCloudSettings() {
+    document.getElementById('cloudSettingsModal').style.display = 'none';
+  }
+  window.closeCloudSettings = closeCloudSettings;
+
+  function saveCloudSettingsFromModal() {
+    const token = document.getElementById('githubToken').value.trim();
+    const gistId = document.getElementById('gistId').value.trim();
+    
+    if (!token) {
+      showCloudStatus('⚠️ Please enter a GitHub token', 'warning');
+      return;
+    }
+    
+    saveCloudSettings({ token, gistId });
+    showCloudStatus('✅ Settings saved!', 'success');
+    // Hide notification if cloud sync is now configured
+    if (token && gistId) {
+      const notification = document.getElementById('cloudSyncNotification');
+      if (notification) notification.style.display = 'none';
+    }
+    setTimeout(() => {
+      closeCloudSettings();
+    }, 1000);
+  }
+  window.saveCloudSettingsFromModal = saveCloudSettingsFromModal;
+
+  function showCloudStatus(message, type = 'info') {
+    const statusElem = document.getElementById('cloudStatus');
+    const colors = {
+      success: { bg: 'rgba(72, 187, 120, 0.1)', border: 'var(--color-success)', text: 'var(--color-success)' },
+      error: { bg: 'rgba(245, 101, 101, 0.1)', border: 'var(--color-danger)', text: 'var(--color-danger)' },
+      warning: { bg: 'rgba(237, 137, 54, 0.1)', border: 'var(--color-warning)', text: 'var(--color-warning)' },
+      info: { bg: 'rgba(66, 153, 225, 0.1)', border: 'var(--color-info)', text: 'var(--color-info)' }
+    };
+    const color = colors[type] || colors.info;
+    statusElem.style.display = 'block';
+    statusElem.style.background = color.bg;
+    statusElem.style.borderLeft = `4px solid ${color.border}`;
+    statusElem.style.color = color.text;
+    statusElem.innerText = message;
+  }
+
+  async function testCloudConnection() {
+    const settings = getCloudSettings();
+    if (!settings.token) {
+      showCloudStatus('⚠️ Please enter a GitHub token first', 'warning');
+      return;
+    }
+    
+    showCloudStatus('🔄 Testing connection...', 'info');
+    
+    try {
+      const response = await fetch('https://api.github.com/user', {
+        headers: {
+          'Authorization': `token ${settings.token}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+      
+      if (response.ok) {
+        const user = await response.json();
+        showCloudStatus(`✅ Connected as ${user.login}`, 'success');
+      } else if (response.status === 401) {
+        showCloudStatus('❌ Invalid token. Please check your token.', 'error');
+      } else {
+        showCloudStatus(`❌ Connection failed: ${response.statusText}`, 'error');
+      }
+    } catch (error) {
+      showCloudStatus(`❌ Error: ${error.message}`, 'error');
+    }
+  }
+  window.testCloudConnection = testCloudConnection;
+
+  async function syncToCloud() {
+    const settings = getCloudSettings();
+    if (!settings.token) {
+      if (confirm('Cloud sync not configured. Open settings to set it up?')) {
+        showCloudSettings();
+      }
+      return;
+    }
+    
+    if (!portfolio.length) {
+      alert('No portfolio data to sync.');
+      return;
+    }
+    
+    if (!currentUser) {
+      alert('Please login first.');
+      return;
+    }
+    
+    const dataToSync = {
+      account: currentUser, // Store which account this data belongs to
+      portfolio: portfolio,
+      users: getUsers(),
+      syncedAt: new Date().toISOString(),
+      version: '1.0'
+    };
+    
+    try {
+      let gistId = settings.gistId;
+      
+      if (gistId) {
+        // Update existing gist
+        const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `token ${settings.token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            files: {
+              [CLOUD_GIST_FILENAME]: {
+                content: JSON.stringify(dataToSync, null, 2)
+              }
+            }
+          })
+        });
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            // Gist not found, create new one
+            gistId = null;
+          } else {
+            throw new Error(`Failed to update: ${response.statusText}`);
+          }
+        } else {
+          alert('✅ Portfolio synced to cloud successfully!');
+          return;
+        }
+      }
+      
+      if (!gistId) {
+        // Create new gist
+        const response = await fetch('https://api.github.com/gists', {
+          method: 'POST',
+          headers: {
+            'Authorization': `token ${settings.token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            description: 'Stock Portfolio MTF Tracker - Portfolio Data',
+            public: false,
+            files: {
+              [CLOUD_GIST_FILENAME]: {
+                content: JSON.stringify(dataToSync, null, 2)
+              }
+            }
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to create: ${response.statusText}`);
+        }
+        
+        const gist = await response.json();
+        gistId = gist.id;
+        settings.gistId = gistId;
+        saveCloudSettings(settings);
+        document.getElementById('gistId').value = gistId;
+        
+        alert(`✅ Portfolio synced to cloud successfully!\n\nGist ID: ${gistId}\n\nSave this ID to sync from other devices.`);
+      }
+    } catch (error) {
+      console.error('Cloud sync error:', error);
+      alert(`❌ Failed to sync to cloud: ${error.message}\n\nPlease check your token and try again.`);
+    }
+  }
+  window.syncToCloud = syncToCloud;
+
+  async function syncFromCloud() {
+    const settings = getCloudSettings();
+    if (!settings.token) {
+      if (confirm('Cloud sync not configured. Open settings to set it up?')) {
+        showCloudSettings();
+      }
+      return;
+    }
+    
+    let gistId = settings.gistId;
+    if (!gistId) {
+      gistId = prompt('Enter Gist ID to sync from:\n\n(Get this from another device after uploading to cloud)');
+      if (!gistId) return;
+      gistId = gistId.trim();
+    }
+    
+    try {
+      const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+        headers: {
+          'Authorization': `token ${settings.token}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('Gist not found. Please check the Gist ID.');
+        }
+        throw new Error(`Failed to fetch: ${response.statusText}`);
+      }
+      
+      const gist = await response.json();
+      const file = gist.files[CLOUD_GIST_FILENAME];
+      
+      if (!file) {
+        throw new Error('Portfolio data file not found in gist.');
+      }
+      
+      const data = JSON.parse(file.content);
+      
+      if (!data.portfolio || !Array.isArray(data.portfolio)) {
+        throw new Error('Invalid data format.');
+      }
+      
+      // Verify this data belongs to the current account
+      if (data.account && data.account !== currentUser) {
+        alert(`⚠️ This cloud data belongs to account "${data.account}", but you're logged in as "${currentUser}".\n\nPlease login with the correct account to sync this data.`);
+        return;
+      }
+      
+      if (!confirm(`Found ${data.portfolio.length} portfolio items for account "${currentUser}".\n\nThis will replace your current portfolio. Continue?`)) {
+        return;
+      }
+      
+      // Merge users data if available
+      if (data.users) {
+        const currentUsers = getUsers();
+        const mergedUsers = { ...currentUsers, ...data.users };
+        saveUsers(mergedUsers);
+      }
+      
+      // Replace portfolio
+      portfolio = data.portfolio.map(stock => {
+        // Recalculate any missing fields
+        const broker = stock.broker || 'POCKETFULL';
+        const mtfFundsValue = Number(stock.mtfFunds || 0);
+        const isMTF = typeof stock.isMTF === 'boolean' ? stock.isMTF : mtfFundsValue > 0;
+        const computedRate = calculateBrokerDailyPercent(broker, mtfFundsValue);
+        return {
+          ...stock,
+          broker,
+          isMTF,
+          interest: isMTF ? Number(stock.interest ?? computedRate) : 0,
+          mtfFunds: isMTF ? mtfFundsValue : 0
+        };
+      });
+      
+      saveUserData();
+      await renderPortfolio();
+      
+      alert(`✅ Portfolio synced from cloud successfully!\n\nLoaded ${portfolio.length} items.\nSynced at: ${data.syncedAt || 'Unknown'}`);
+    } catch (error) {
+      console.error('Cloud sync error:', error);
+      alert(`❌ Failed to sync from cloud: ${error.message}\n\nPlease check your token and Gist ID.`);
+    }
+  }
+  window.syncFromCloud = syncFromCloud;
+
+  // ====== GOOGLE DRIVE SYNC ======
+  const GOOGLE_DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+  const GOOGLE_DRIVE_FILENAME = 'portfolio-data.json';
+  const GOOGLE_DRIVE_MIMETYPE = 'application/json';
+  
+  let googleDriveAccessToken = null;
+  let googleDriveFileId = null;
+
+  // Initialize Google Drive API
+  async function initGoogleDrive() {
+    return new Promise((resolve, reject) => {
+      if (typeof gapi === 'undefined') {
+        reject(new Error('Google API not loaded'));
+        return;
+      }
+      
+      gapi.load('client', async () => {
+        try {
+          // Note: In production, you need to set your Google API Client ID
+          // For now, we'll use a client-side approach with OAuth 2.0
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+  }
+
+  // Authenticate with Google Drive using OAuth 2.0
+  async function authenticateGoogleDrive() {
+    return new Promise((resolve, reject) => {
+      if (typeof google === 'undefined' || !google.accounts) {
+        reject(new Error('Google Identity Services not loaded. Please refresh the page.'));
+        return;
+      }
+
+      // Check if already authenticated and token is valid
+      const savedToken = localStorage.getItem('stockapp_googledrive_token');
+      const expiry = localStorage.getItem('stockapp_googledrive_token_expiry');
+      const savedFileId = localStorage.getItem('stockapp_googledrive_fileid');
+      
+      if (savedToken && expiry && Date.now() < parseInt(expiry)) {
+        googleDriveAccessToken = savedToken;
+        googleDriveFileId = savedFileId;
+        resolve(savedToken);
+        return;
+      }
+
+      // Get client ID
+      let clientId = localStorage.getItem('stockapp_googledrive_clientid');
+      
+      if (!clientId) {
+        clientId = prompt(
+          'Enter your Google OAuth Client ID:\n\n' +
+          '1. Go to https://console.cloud.google.com/apis/credentials\n' +
+          '2. Create OAuth 2.0 Client ID (Web application)\n' +
+          '3. Add authorized JavaScript origins (your website URL)\n' +
+          '4. Copy the Client ID here'
+        );
+        
+        if (!clientId) {
+          reject(new Error('Client ID required for Google Drive sync'));
+          return;
+        }
+        
+        localStorage.setItem('stockapp_googledrive_clientid', clientId);
+      }
+
+      // Use Google Identity Services for OAuth
+      const tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: GOOGLE_DRIVE_SCOPES,
+        callback: (response) => {
+          if (response.error) {
+            reject(new Error(response.error));
+            return;
+          }
+          googleDriveAccessToken = response.access_token;
+          localStorage.setItem('stockapp_googledrive_token', response.access_token);
+          if (response.expires_in) {
+            const expiry = Date.now() + (response.expires_in * 1000);
+            localStorage.setItem('stockapp_googledrive_token_expiry', expiry.toString());
+          }
+          resolve(response.access_token);
+        }
+      });
+      tokenClient.requestAccessToken();
+    });
+  }
+
+  // Find or create file in Google Drive
+  async function findOrCreateDriveFile() {
+    if (!googleDriveAccessToken) {
+      await authenticateGoogleDrive();
+    }
+
+    // First, try to find existing file
+    try {
+      const response = await fetch('https://www.googleapis.com/drive/v3/files?q=name="' + GOOGLE_DRIVE_FILENAME + '" and trashed=false', {
+        headers: {
+          'Authorization': `Bearer ${googleDriveAccessToken}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.files && data.files.length > 0) {
+          googleDriveFileId = data.files[0].id;
+          localStorage.setItem('stockapp_googledrive_fileid', googleDriveFileId);
+          return googleDriveFileId;
+        }
+      }
+    } catch (error) {
+      console.log('Error finding file:', error);
+    }
+
+    // File not found, create new one
+    try {
+      const metadata = {
+        name: GOOGLE_DRIVE_FILENAME,
+        mimeType: GOOGLE_DRIVE_MIMETYPE
+      };
+
+      const response = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${googleDriveAccessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(metadata)
+      });
+
+      if (response.ok) {
+        const file = await response.json();
+        googleDriveFileId = file.id;
+        localStorage.setItem('stockapp_googledrive_fileid', googleDriveFileId);
+        return googleDriveFileId;
+      } else {
+        throw new Error('Failed to create file in Google Drive');
+      }
+    } catch (error) {
+      throw new Error('Failed to create file: ' + error.message);
+    }
+  }
+
+  // Upload data to Google Drive
+  async function syncToGoogleDrive() {
+    if (!currentUser) {
+      alert('Please login first.');
+      return;
+    }
+
+    if (!portfolio.length) {
+      alert('No portfolio data to sync.');
+      return;
+    }
+
+    try {
+      // Authenticate
+      await authenticateGoogleDrive();
+      
+      // Find or create file
+      const fileId = await findOrCreateDriveFile();
+
+      // Prepare data
+      const dataToSync = {
+        account: currentUser,
+        portfolio: portfolio,
+        users: getUsers(),
+        syncedAt: new Date().toISOString(),
+        version: '1.0'
+      };
+
+      const fileContent = JSON.stringify(dataToSync, null, 2);
+
+      // Upload file content
+      const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${googleDriveAccessToken}`,
+          'Content-Type': GOOGLE_DRIVE_MIMETYPE
+        },
+        body: fileContent
+      });
+
+      if (response.ok) {
+        alert('✅ Portfolio synced to Google Drive successfully!');
+        console.log('✓ Data uploaded to Google Drive');
+      } else {
+        const error = await response.json();
+        throw new Error(error.error?.message || 'Failed to upload to Google Drive');
+      }
+    } catch (error) {
+      console.error('Google Drive sync error:', error);
+      alert(`❌ Failed to sync to Google Drive: ${error.message}\n\nPlease make sure you have authenticated with Google Drive.`);
+    }
+  }
+  window.syncToGoogleDrive = syncToGoogleDrive;
+
+  // Download data from Google Drive
+  async function syncFromGoogleDrive() {
+    if (!currentUser) {
+      alert('Please login first.');
+      return;
+    }
+
+    try {
+      // Authenticate
+      await authenticateGoogleDrive();
+      
+      // Find file
+      const fileId = await findOrCreateDriveFile();
+      
+      if (!fileId) {
+        throw new Error('File not found in Google Drive');
+      }
+
+      // Download file content
+      const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        headers: {
+          'Authorization': `Bearer ${googleDriveAccessToken}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('File not found in Google Drive');
+        }
+        throw new Error(`Failed to fetch: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.portfolio || !Array.isArray(data.portfolio)) {
+        throw new Error('Invalid data format.');
+      }
+
+      // Verify account
+      if (data.account && data.account !== currentUser) {
+        alert(`⚠️ This data belongs to account "${data.account}", but you're logged in as "${currentUser}".\n\nPlease login with the correct account to sync this data.`);
+        return;
+      }
+
+      if (!confirm(`Found ${data.portfolio.length} portfolio items for account "${currentUser}".\n\nThis will replace your current portfolio. Continue?`)) {
+        return;
+      }
+
+      // Merge users data if available
+      if (data.users) {
+        const currentUsers = getUsers();
+        const mergedUsers = { ...currentUsers, ...data.users };
+        saveUsers(mergedUsers);
+      }
+
+      // Replace portfolio
+      portfolio = data.portfolio.map(stock => {
+        const broker = stock.broker || 'POCKETFULL';
+        const mtfFundsValue = Number(stock.mtfFunds || 0);
+        const isMTF = typeof stock.isMTF === 'boolean' ? stock.isMTF : mtfFundsValue > 0;
+        const computedRate = calculateBrokerDailyPercent(broker, mtfFundsValue);
+        return {
+          ...stock,
+          broker,
+          isMTF,
+          interest: isMTF ? Number(stock.interest ?? computedRate) : 0,
+          mtfFunds: isMTF ? mtfFundsValue : 0
+        };
+      });
+
+      saveUserData();
+      await renderPortfolio();
+
+      alert(`✅ Portfolio synced from Google Drive successfully!\n\nLoaded ${portfolio.length} items.\nSynced at: ${data.syncedAt || 'Unknown'}`);
+    } catch (error) {
+      console.error('Google Drive sync error:', error);
+      alert(`❌ Failed to sync from Google Drive: ${error.message}\n\nPlease make sure you have authenticated with Google Drive.`);
+    }
+  }
+  window.syncFromGoogleDrive = syncFromGoogleDrive;
+
 
   const SEARCH_CONFIG = {
     minQueryLength: 2,
@@ -1149,6 +1820,30 @@
       handleUploadCSVFile(file);
     });
   }
+  
+  const syncToCloudBtn = document.getElementById('syncToCloudBtn');
+  const syncFromCloudBtn = document.getElementById('syncFromCloudBtn');
+  const cloudSettingsBtn = document.getElementById('cloudSettingsBtn');
+  
+  if (syncToCloudBtn) {
+    syncToCloudBtn.addEventListener('click', syncToCloud);
+  }
+  if (syncFromCloudBtn) {
+    syncFromCloudBtn.addEventListener('click', syncFromCloud);
+  }
+  if (cloudSettingsBtn) {
+    cloudSettingsBtn.addEventListener('click', showCloudSettings);
+  }
+  
+  const syncToDriveBtn = document.getElementById('syncToDriveBtn');
+  const syncFromDriveBtn = document.getElementById('syncFromDriveBtn');
+  
+  if (syncToDriveBtn) {
+    syncToDriveBtn.addEventListener('click', syncToGoogleDrive);
+  }
+  if (syncFromDriveBtn) {
+    syncFromDriveBtn.addEventListener('click', syncFromGoogleDrive);
+  }
 
   document.addEventListener('click', function(e) {
     if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
@@ -1279,12 +1974,213 @@
     CURRENT_USER: 'stockapp_current_user',
     CURRENT_USER_DISPLAY: 'stockapp_current_user_display',
     REMEMBERED_USERS: 'stockapp_remembered_users',
-    REMEMBERED_LAST: 'stockapp_last_remembered_user'
+    REMEMBERED_LAST: 'stockapp_last_remembered_user',
+    REGISTERED_DEVICES: 'stockapp_registered_devices',
+    DEVICE_LIMIT: 'stockapp_device_limit'
   };
   const LOGIN_SECURITY = {
     maxAttempts: 5,
     lockoutMinutes: 5
   };
+  const DEVICE_CONFIG = {
+    MAX_DEVICES: 3, // Maximum number of devices allowed
+    ADMIN_PASSWORD: 'admin123' // Change this to your secure password
+  };
+
+  // ====== DEVICE MANAGEMENT ======
+  function generateDeviceId() {
+    // Create a unique device fingerprint
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'top';
+    ctx.font = '14px Arial';
+    ctx.fillText('Device fingerprint', 2, 2);
+    
+    const fingerprint = [
+      navigator.userAgent,
+      navigator.language,
+      screen.width + 'x' + screen.height,
+      new Date().getTimezoneOffset(),
+      canvas.toDataURL(),
+      navigator.hardwareConcurrency || 'unknown'
+    ].join('|');
+    
+    // Hash the fingerprint
+    let hash = 0;
+    for (let i = 0; i < fingerprint.length; i++) {
+      const char = fingerprint.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return 'device_' + Math.abs(hash).toString(36);
+  }
+
+  function getDeviceId() {
+    let deviceId = localStorage.getItem('stockapp_device_id');
+    if (!deviceId) {
+      deviceId = generateDeviceId();
+      localStorage.setItem('stockapp_device_id', deviceId);
+    }
+    return deviceId;
+  }
+
+  function getRegisteredDevices() {
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.REGISTERED_DEVICES) || '[]');
+  }
+
+  function saveRegisteredDevices(devices) {
+    localStorage.setItem(STORAGE_KEYS.REGISTERED_DEVICES, JSON.stringify(devices));
+  }
+
+  function isDeviceRegistered() {
+    const deviceId = getDeviceId();
+    const registered = getRegisteredDevices();
+    return registered.some(d => d.id === deviceId);
+  }
+
+  function registerDevice(deviceName = '') {
+    const deviceId = getDeviceId();
+    const registered = getRegisteredDevices();
+    
+    if (registered.length >= DEVICE_CONFIG.MAX_DEVICES) {
+      return { success: false, message: `Maximum ${DEVICE_CONFIG.MAX_DEVICES} devices allowed. Please remove an existing device first.` };
+    }
+    
+    if (registered.some(d => d.id === deviceId)) {
+      return { success: true, message: 'Device already registered.' };
+    }
+    
+    registered.push({
+      id: deviceId,
+      name: deviceName || `Device ${registered.length + 1}`,
+      registeredAt: new Date().toISOString(),
+      userAgent: navigator.userAgent.substring(0, 100)
+    });
+    
+    saveRegisteredDevices(registered);
+    return { success: true, message: 'Device registered successfully!' };
+  }
+
+  function removeDevice(deviceId) {
+    const registered = getRegisteredDevices();
+    const filtered = registered.filter(d => d.id !== deviceId);
+    saveRegisteredDevices(filtered);
+    return filtered;
+  }
+
+  function showDeviceRegistration() {
+    document.getElementById('deviceScreen').style.display = 'block';
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('signupScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('deviceBackButton').style.display = 'none';
+  }
+
+  function hideDeviceRegistration() {
+    document.getElementById('deviceScreen').style.display = 'none';
+  }
+
+  function showDeviceManagement() {
+    renderDeviceList();
+    document.getElementById('deviceScreen').style.display = 'block';
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('deviceBackButton').style.display = 'block';
+    // Clear form fields
+    document.getElementById('deviceName').value = '';
+    document.getElementById('deviceError').style.display = 'none';
+  }
+  window.showDeviceManagement = showDeviceManagement;
+
+  function backToApp() {
+    if (currentUser) {
+      showMainApp();
+    } else {
+      showLoginForm();
+    }
+  }
+  window.backToApp = backToApp;
+
+  function renderDeviceList() {
+    const devices = getRegisteredDevices();
+    const currentDeviceId = getDeviceId();
+    const countElem = document.getElementById('deviceCount');
+    const listElem = document.getElementById('deviceListItems');
+    
+    if (countElem) countElem.textContent = devices.length;
+    
+    if (!listElem) return;
+    
+    if (devices.length === 0) {
+      listElem.innerHTML = '<p style="text-align: center; color: var(--color-text-light); font-size: 13px;">No devices registered yet.</p>';
+      return;
+    }
+    
+    listElem.innerHTML = devices.map(device => {
+      const isCurrent = device.id === currentDeviceId;
+      const date = new Date(device.registeredAt).toLocaleDateString();
+      return `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 8px; background: ${isCurrent ? 'rgba(102, 126, 234, 0.1)' : 'var(--color-card-bg)'}; border-radius: 8px; border: 1px solid var(--color-border);">
+          <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 14px;">${device.name} ${isCurrent ? '<span style="color: var(--color-success);">(Current)</span>' : ''}</div>
+            <div style="font-size: 12px; color: var(--color-text-light); margin-top: 4px;">Registered: ${date}</div>
+          </div>
+          ${!isCurrent ? `<button onclick="removeDeviceById('${device.id}')" style="background: var(--color-danger); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Remove</button>` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  function removeDeviceById(deviceId) {
+    if (!confirm('Are you sure you want to remove this device? It will need to be registered again to access the app.')) {
+      return;
+    }
+    removeDevice(deviceId);
+    renderDeviceList();
+  }
+  window.removeDeviceById = removeDeviceById;
+
+  function handleDeviceRegistration() {
+    const deviceName = document.getElementById('deviceName').value.trim() || `Device ${getRegisteredDevices().length + 1}`;
+    const errorElem = document.getElementById('deviceError');
+    
+    errorElem.style.display = 'none';
+    
+    // Auto-register device (no password required - just for tracking)
+    const result = registerDevice(deviceName);
+    if (result.success) {
+      errorElem.innerText = '✅ ' + result.message;
+      errorElem.style.color = 'var(--color-success)';
+      errorElem.style.background = 'rgba(72, 187, 120, 0.1)';
+      errorElem.style.display = 'block';
+      renderDeviceList();
+      setTimeout(() => {
+        hideDeviceRegistration();
+        showLoginForm();
+      }, 1500);
+    } else {
+      errorElem.innerText = '❌ ' + result.message;
+      errorElem.style.display = 'block';
+    }
+  }
+
+  // Auto-register device when user logs in (for tracking purposes)
+  function autoRegisterDeviceOnLogin() {
+    if (!currentUser) return;
+    const deviceId = getDeviceId();
+    const registered = getRegisteredDevices();
+    
+    // Check if already registered
+    if (registered.some(d => d.id === deviceId)) {
+      return; // Already registered
+    }
+    
+    // Auto-register if under limit
+    if (registered.length < DEVICE_CONFIG.MAX_DEVICES) {
+      const deviceName = `${navigator.userAgent.includes('Mobile') ? 'Mobile' : 'Desktop'} Device`;
+      registerDevice(deviceName);
+      console.log('✓ Device auto-registered for tracking');
+    }
+  }
 
   // ====== HELPERS ======
   function normalizeUsername(username = '') {
@@ -1369,6 +2265,168 @@
     }
   }
 
+  // ====== TOKEN-BASED AUTHENTICATION SYSTEM ======
+  // Client-side JWT-like token system for stateless, multi-device authentication
+  
+  const TOKEN_CONFIG = {
+    ACCESS_TOKEN_EXPIRY: 60 * 60 * 1000, // 1 hour (short-lived)
+    REFRESH_TOKEN_EXPIRY: 7 * 24 * 60 * 60 * 1000, // 7 days (long-lived)
+    TOKEN_SECRET_KEY: 'stockapp_token_secret_2024' // In production, this should be server-side
+  };
+
+  // Generate a simple token (client-side JWT-like structure)
+  async function generateToken(payload, expiresIn) {
+    const header = {
+      alg: 'HS256',
+      typ: 'JWT'
+    };
+    
+    const now = Date.now();
+    const tokenPayload = {
+      ...payload,
+      iat: now, // Issued at
+      exp: now + expiresIn // Expires at
+    };
+    
+    // Simple base64 encoding (in production, use proper JWT library with signing)
+    const encodedHeader = btoa(JSON.stringify(header));
+    const encodedPayload = btoa(JSON.stringify(tokenPayload));
+    
+    // Create a simple signature (in production, use HMAC-SHA256)
+    const hash = await hashPassword(encodedHeader + encodedPayload + TOKEN_CONFIG.TOKEN_SECRET_KEY);
+    const signature = btoa(JSON.stringify({ hash }));
+    
+    return `${encodedHeader}.${encodedPayload}.${signature}`;
+  }
+
+  // Validate and decode token
+  async function validateToken(token) {
+    if (!token) return null;
+    
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return null;
+      
+      const [encodedHeader, encodedPayload, encodedSignature] = parts;
+      
+      // Decode payload
+      const payload = JSON.parse(atob(encodedPayload));
+      
+      // Check expiration
+      if (payload.exp && Date.now() > payload.exp) {
+        return { valid: false, expired: true };
+      }
+      
+      // Verify signature (simplified client-side check)
+      const expectedSignature = btoa(JSON.stringify({
+        hash: await hashPassword(encodedHeader + encodedPayload + TOKEN_CONFIG.TOKEN_SECRET_KEY)
+      }));
+      
+      if (encodedSignature !== expectedSignature) {
+        return { valid: false, invalid: true };
+      }
+      
+      return { valid: true, payload };
+    } catch (error) {
+      console.error('Token validation error:', error);
+      return null;
+    }
+  }
+
+  // Store tokens securely
+  function storeTokens(accessToken, refreshToken) {
+    localStorage.setItem('stockapp_access_token', accessToken);
+    localStorage.setItem('stockapp_refresh_token', refreshToken);
+    localStorage.setItem('stockapp_tokens_issued_at', Date.now().toString());
+  }
+
+  // Get stored tokens
+  function getStoredTokens() {
+    return {
+      accessToken: localStorage.getItem('stockapp_access_token'),
+      refreshToken: localStorage.getItem('stockapp_refresh_token')
+    };
+  }
+
+  // Clear tokens (logout)
+  function clearTokens() {
+    localStorage.removeItem('stockapp_access_token');
+    localStorage.removeItem('stockapp_refresh_token');
+    localStorage.removeItem('stockapp_tokens_issued_at');
+  }
+
+  // Refresh access token using refresh token
+  async function refreshAccessToken() {
+    const { refreshToken } = getStoredTokens();
+    if (!refreshToken) return null;
+    
+    const validation = await validateToken(refreshToken);
+    if (!validation || !validation.valid) {
+      // Refresh token expired or invalid - user needs to login again
+      clearTokens();
+      return null;
+    }
+    
+    // Generate new access token
+    const newAccessToken = await generateToken(
+      { userId: validation.payload.userId, username: validation.payload.username },
+      TOKEN_CONFIG.ACCESS_TOKEN_EXPIRY
+    );
+    
+    // Store new access token
+    localStorage.setItem('stockapp_access_token', newAccessToken);
+    localStorage.setItem('stockapp_tokens_issued_at', Date.now().toString());
+    
+    return newAccessToken;
+  }
+
+  // Get valid access token (auto-refresh if needed)
+  async function getValidAccessToken() {
+    const { accessToken } = getStoredTokens();
+    
+    if (!accessToken) {
+      // Try to refresh
+      return await refreshAccessToken();
+    }
+    
+    const validation = await validateToken(accessToken);
+    
+    if (!validation || !validation.valid) {
+      if (validation?.expired) {
+        // Access token expired, try to refresh
+        return await refreshAccessToken();
+      }
+      // Token invalid, clear and return null
+      clearTokens();
+      return null;
+    }
+    
+    return accessToken;
+  }
+
+  // Check if user is authenticated (has valid tokens)
+  async function isAuthenticated() {
+    const accessToken = await getValidAccessToken();
+    if (!accessToken) return false;
+    
+    const validation = await validateToken(accessToken);
+    return validation?.valid === true;
+  }
+
+  // Get current user from token
+  async function getCurrentUserFromToken() {
+    const accessToken = await getValidAccessToken();
+    if (!accessToken) return null;
+    
+    const validation = await validateToken(accessToken);
+    if (!validation || !validation.valid) return null;
+    
+    return {
+      userId: validation.payload.userId,
+      username: validation.payload.username
+    };
+  }
+
   // ====== USER AUTHENTICATION ======
   // Password hashing using SHA-256
   async function hashPassword(password) {
@@ -1381,12 +2439,14 @@
 
   // Show/hide forms
   function showSignupForm() {
+    document.getElementById('deviceScreen').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'none';
     document.getElementById('signupScreen').style.display = 'block';
   }
 
   function showLoginForm() {
+    document.getElementById('deviceScreen').style.display = 'none';
     document.getElementById('signupScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'block';
@@ -1450,7 +2510,7 @@
         return;
       }
       
-      // Successful login
+      // Successful login - Generate tokens (JWT-like system)
       record.failedAttempts = 0;
       delete record.lockedUntil;
       record.lastLogin = new Date().toISOString();
@@ -1459,13 +2519,30 @@
       usernameInput.value = '';
       passwordInput.value = '';
       
+      // Generate Access Token (short-lived: 1 hour)
+      const accessToken = await generateToken(
+        { userId: key, username: key, displayName: record.displayName || username },
+        TOKEN_CONFIG.ACCESS_TOKEN_EXPIRY
+      );
+      
+      // Generate Refresh Token (long-lived: 7 days)
+      const refreshToken = await generateToken(
+        { userId: key, username: key, type: 'refresh' },
+        TOKEN_CONFIG.REFRESH_TOKEN_EXPIRY
+      );
+      
+      // Store tokens securely
+      storeTokens(accessToken, refreshToken);
+      
+      // Also store user info for backward compatibility
       currentUser = key;
       currentUserDisplayName = record.displayName || username;
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, key);
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER_DISPLAY, currentUserDisplayName);
       
-      loadUserData();
-      showMainApp();
+      // Load user data (will auto-sync from cloud if configured)
+      await loadUserData();
+      await showMainApp();
       promptRememberDevice(key);
     } catch (err) {
       console.error('Login failed:', err);
@@ -1525,16 +2602,34 @@
     const strengthMeterSignup = document.getElementById('passwordStrength');
     if (strengthMeterSignup) strengthMeterSignup.style.display = 'none';
     
+    // Generate tokens for new user (JWT-like system)
+    const accessToken = await generateToken(
+      { userId: normalized, username: normalized, displayName: username },
+      TOKEN_CONFIG.ACCESS_TOKEN_EXPIRY
+    );
+    
+    const refreshToken = await generateToken(
+      { userId: normalized, username: normalized, type: 'refresh' },
+      TOKEN_CONFIG.REFRESH_TOKEN_EXPIRY
+    );
+    
+    // Store tokens securely
+    storeTokens(accessToken, refreshToken);
+    
+    // Also store user info for backward compatibility
     currentUser = normalized;
     currentUserDisplayName = username;
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER, normalized);
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER_DISPLAY, username);
-    loadUserData();
-    showMainApp();
+    // Load user data (will auto-sync from cloud if configured)
+    await loadUserData();
+    await showMainApp();
   }
 
   function handleLogout() {
     saveUserData();
+    // Clear all tokens (revoke access)
+    clearTokens();
     currentUser = null;
     currentUserDisplayName = '';
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
@@ -1565,21 +2660,60 @@
     document.getElementById('signupError').style.display = 'none';
   }
 
-  function showMainApp() {
+  async function showMainApp() {
+    document.getElementById('deviceScreen').style.display = 'none';
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('signupScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'block';
     document.getElementById('displayUsername').innerText = currentUserDisplayName || currentUser || '';
-    renderPortfolio();
+    // Auto-register device for tracking (optional, non-blocking)
+    autoRegisterDeviceOnLogin();
+    // Load user data (will auto-sync from cloud if configured)
+    await loadUserData();
+    await renderPortfolio();
+    
+    // Show cloud sync notification if not configured
+    checkAndShowCloudSyncNotification();
   }
 
-  function saveUserData() {
-    if (currentUser) {
-      localStorage.setItem(`stockapp_portfolio_${currentUser}`, JSON.stringify(portfolio));
+  function checkAndShowCloudSyncNotification() {
+    const notification = document.getElementById('cloudSyncNotification');
+    if (!notification) return;
+    
+    const dismissed = localStorage.getItem('stockapp_cloud_sync_notification_dismissed') === 'true';
+    if (dismissed) {
+      notification.style.display = 'none';
+      return;
+    }
+    
+    const settings = getCloudSettings();
+    if (!settings.token || !settings.gistId) {
+      // Cloud sync not configured - show notification
+      notification.style.display = 'block';
+    } else {
+      // Cloud sync configured - hide notification
+      notification.style.display = 'none';
     }
   }
 
-  function loadUserData() {
+  async function saveUserData(autoSync = true) {
+    if (currentUser) {
+      localStorage.setItem(`stockapp_portfolio_${currentUser}`, JSON.stringify(portfolio));
+      
+      // Auto-sync to cloud if configured (silently in background)
+      if (autoSync) {
+        const settings = getCloudSettings();
+        if (settings.token && settings.gistId && portfolio.length > 0) {
+          // Sync in background without blocking
+          syncToCloudSilent().catch(err => {
+            console.log('Auto-sync failed (non-critical):', err.message);
+          });
+        }
+      }
+    }
+  }
+
+  async function loadUserData(autoSync = true) {
     if (currentUser) {
       const saved = localStorage.getItem(`stockapp_portfolio_${currentUser}`);
       portfolio = saved ? JSON.parse(saved) : [];
@@ -1596,10 +2730,176 @@
           mtfFunds: isMTF ? mtfFundsValue : 0
         };
       });
+      
+      // Auto-sync from cloud on login if configured
+      if (autoSync) {
+        const settings = getCloudSettings();
+        if (settings.token && settings.gistId) {
+          // Try to sync from cloud silently, merge if newer data exists
+          try {
+            await syncFromCloudSilent();
+          } catch (err) {
+            console.log('Auto-sync from cloud failed (using local data):', err.message);
+          }
+        }
+      }
     }
   }
 
-  function autoLoginRememberedUser() {
+  // Silent cloud sync functions (no alerts, for automatic sync)
+  async function syncToCloudSilent() {
+    const settings = getCloudSettings();
+    if (!settings.token || !portfolio.length || !currentUser) return;
+    
+    const dataToSync = {
+      account: currentUser, // Store which account this data belongs to
+      portfolio: portfolio,
+      users: getUsers(),
+      syncedAt: new Date().toISOString(),
+      version: '1.0'
+    };
+    
+    let gistId = settings.gistId;
+    
+    if (gistId) {
+      const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `token ${settings.token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          files: {
+            [CLOUD_GIST_FILENAME]: {
+              content: JSON.stringify(dataToSync, null, 2)
+            }
+          }
+        })
+      });
+      
+      if (!response.ok && response.status !== 404) {
+        throw new Error(`Sync failed: ${response.statusText}`);
+      }
+      
+      if (response.ok) {
+        console.log('✓ Auto-synced to cloud');
+        return;
+      }
+    }
+    
+    // Create new gist if doesn't exist
+    if (!gistId) {
+      const response = await fetch('https://api.github.com/gists', {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${settings.token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          description: `Stock Portfolio MTF Tracker - Portfolio Data (Account: ${currentUser})`,
+          public: false,
+          files: {
+            [CLOUD_GIST_FILENAME]: {
+              content: JSON.stringify(dataToSync, null, 2)
+            }
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to create gist: ${response.statusText}`);
+      }
+      
+      const gist = await response.json();
+      gistId = gist.id;
+      settings.gistId = gistId;
+      saveCloudSettings(settings);
+      console.log('✓ Created new cloud sync gist:', gistId);
+    }
+  }
+
+  async function syncFromCloudSilent() {
+    const settings = getCloudSettings();
+    if (!settings.token || !settings.gistId) return;
+    
+    const response = await fetch(`https://api.github.com/gists/${settings.gistId}`, {
+      headers: {
+        'Authorization': `token ${settings.token}`,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.log('Cloud gist not found, using local data');
+        return;
+      }
+      throw new Error(`Failed to fetch: ${response.statusText}`);
+    }
+    
+    const gist = await response.json();
+    const file = gist.files[CLOUD_GIST_FILENAME];
+    
+    if (!file) {
+      console.log('No portfolio data in cloud gist');
+      return;
+    }
+    
+    const data = JSON.parse(file.content);
+    
+    if (!data.portfolio || !Array.isArray(data.portfolio)) {
+      throw new Error('Invalid data format');
+    }
+    
+    // Verify this data belongs to the current account
+    if (data.account && data.account !== currentUser) {
+      console.log(`Cloud data belongs to account "${data.account}", but current account is "${currentUser}". Skipping sync.`);
+      return; // Don't sync data from a different account
+    }
+    
+    // Check if cloud data is newer than local
+    const localSaved = localStorage.getItem(`stockapp_portfolio_${currentUser}`);
+    const localData = localSaved ? JSON.parse(localSaved) : [];
+    const cloudTime = new Date(data.syncedAt || 0);
+    const localTime = localData.length > 0 ? new Date(localData[0]?.lastModified || 0) : new Date(0);
+    
+    // Merge: prefer cloud if newer, otherwise merge both
+    if (cloudTime > localTime || localData.length === 0) {
+      // Use cloud data (it's newer or local is empty)
+      portfolio = data.portfolio.map(stock => {
+        const broker = stock.broker || 'POCKETFULL';
+        const mtfFundsValue = Number(stock.mtfFunds || 0);
+        const isMTF = typeof stock.isMTF === 'boolean' ? stock.isMTF : mtfFundsValue > 0;
+        const computedRate = calculateBrokerDailyPercent(broker, mtfFundsValue);
+        return {
+          ...stock,
+          broker,
+          isMTF,
+          interest: isMTF ? Number(stock.interest ?? computedRate) : 0,
+          mtfFunds: isMTF ? mtfFundsValue : 0
+        };
+      });
+      
+      // Merge users data
+      if (data.users) {
+        const currentUsers = getUsers();
+        const mergedUsers = { ...currentUsers, ...data.users };
+        saveUsers(mergedUsers);
+      }
+      
+      // Save merged data locally
+      localStorage.setItem(`stockapp_portfolio_${currentUser}`, JSON.stringify(portfolio));
+      console.log('✓ Auto-synced from cloud:', portfolio.length, 'stocks');
+    } else {
+      // Local is newer, upload local to cloud
+      console.log('Local data is newer, uploading to cloud...');
+      await syncToCloudSilent();
+    }
+  }
+
+  async function autoLoginRememberedUser() {
     const remembered = getRememberedUsers();
     let rememberedUser = localStorage.getItem(STORAGE_KEYS.REMEMBERED_LAST);
     if (!rememberedUser || !remembered[rememberedUser]) {
@@ -1616,8 +2916,9 @@
     currentUserDisplayName = record.displayName || rememberedUser;
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER, rememberedUser);
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER_DISPLAY, currentUserDisplayName);
-    loadUserData();
-    showMainApp();
+    // Load user data (will auto-sync from cloud if configured)
+    await loadUserData();
+    await showMainApp();
     return true;
   }
 
@@ -2030,23 +3331,46 @@
     });
   }
 
-  // On load: Check if user is already logged in
-  window.addEventListener('DOMContentLoaded', function() {
+  // On load: Token-based authentication check (stateless, multi-device support)
+  window.addEventListener('DOMContentLoaded', async function() {
     populateBrokerOptions();
     handleBrokerChange();
     applyMTFState();
     updateInterestFromInputs();
-    const savedUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-    const savedDisplay = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_DISPLAY);
-    if (savedUser) {
-      currentUser = savedUser;
-      currentUserDisplayName = savedDisplay || savedUser;
-      loadUserData();
-      showMainApp();
-    } else {
-      const autoLogged = autoLoginRememberedUser();
-      if (!autoLogged) {
+    
+    // Check for valid tokens first (stateless authentication)
+    const authenticated = await isAuthenticated();
+    
+    if (authenticated) {
+      // User has valid tokens - authenticate automatically
+      const userInfo = await getCurrentUserFromToken();
+      if (userInfo) {
+        currentUser = userInfo.userId;
+        currentUserDisplayName = userInfo.username;
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, currentUser);
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER_DISPLAY, currentUserDisplayName);
+        // Load user data (will auto-sync from cloud if configured)
+        await loadUserData();
+        await showMainApp();
+      } else {
+        // Token invalid, show login
         showLoginForm();
+      }
+    } else {
+      // No valid tokens - check for remembered user (backward compatibility)
+      const savedUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+      const savedDisplay = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_DISPLAY);
+      if (savedUser) {
+        currentUser = savedUser;
+        currentUserDisplayName = savedDisplay || savedUser;
+        // Load user data (will auto-sync from cloud if configured)
+        loadUserData().then(() => showMainApp());
+      } else {
+        autoLoginRememberedUser().then(logged => {
+          if (!logged) {
+            showLoginForm();
+          }
+        });
       }
     }
     document.getElementById('entryDate').value = todayISO();
